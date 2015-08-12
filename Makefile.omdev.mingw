@@ -3,12 +3,23 @@ REALPATH = $(realpath .)
 OMBUILDDIR=$(REALPATH)/build
 CMAKE = $(OMDEV)/bin/cmake/bin/cmake
 CMAKE_TARGET = "MSYS Makefiles"
-DBUS_INCLUDE_DIR = $(OMDEV)/lib/dbus-1.6.0-win32/include/
-DBUS_INCLUDE_LIB_DIR = $(OMDEV)/lib/dbus-1.6.0-win32/lib/
-DBUS_PATH = $(OMDEV)/lib/dbus-1.6.0-win32/
+
+PKG_CONFIG_BIN = $(OMDEV)/lib/gtk+-2.24.10/bin
+ifeq (MINGW32,$(findstring MINGW32,$(shell uname)))
+DBUS_INCLUDE_DIR = $(OMDEV)/tools/msys/mingw32/include/dbus-1.0/
+DBUS_INCLUDE_LIB_DIR = $(OMDEV)/tools/msys/mingw32/lib/dbus-1.0/include/
+DBUS_PATH = $(OMDEV)/tools/msys/mingw32/bin/
 BOOST_PATH = $(OMDEV)/lib/3rdParty/boost-1_55/
-PKG_CONFIG_PATH = $(OMDEV)/lib/gtk+-2.24.10/bin/
-OSG_PATH = $(OMDEV)/lib/openscenegraph-2.8.3-mingw/
+OSG_PATH = $(OMDEV)/tools/msys/mingw32/
+PKG_CONFIG_PATH=$(OMDEV)/tools/msys/mingw32/lib/pkgconfig
+else # mingw64
+DBUS_INCLUDE_DIR = $(OMDEV)/tools/msys/mingw64/include/dbus-1.0/
+DBUS_INCLUDE_LIB_DIR = $(OMDEV)/tools/msys/mingw64/lib/dbus-1.0/include/
+DBUS_PATH = $(OMDEV)/tools/msys/mingw64/bin/
+BOOST_PATH = $(OMDEV)/tools/msys/mingw64/include
+OSG_PATH = $(OMDEV)/tools/msys/mingw64/
+PKG_CONFIG_PATH=$(OMDEV)/tools/msys/mingw64/lib/pkgconfig
+endif
 
 .PHONY: omc omc-diff omlibrary-core omplot omedit omnotebook omshell omoptim modelica3d
 
@@ -72,7 +83,7 @@ testlogwindows:
 
 builddir_lib=$(OMBUILDDIR)/lib
 builddir_share=$(OMBUILDDIR)/share
-IDLPYTHON = $(OMDEV)/lib/omniORB-4.1.6-msvc-10/bin/x86_win32/omniidl -bpython -Wbglobal=_OMCIDL -Wbpackage=OMPythonIDL
+IDLPYTHON = $(OMDEV)/lib/omniORB-4.2.0-msvc-10/bin/x86_win32/omniidl -bpython -Wbglobal=_OMCIDL -Wbpackage=OMPythonIDL
 IDLPYTHONTARGET = $(builddir_share)/omc/scripts/PythonInterface/OMPythonIDL/omc_communication_idl.py
 IDLFILE=OMCompiler/Compiler/runtime/omc_communication.idl
 
@@ -82,14 +93,14 @@ install-python: $(IDLPYTHONTARGET)
 
 script-files-python: mkbuilddirs-python
 	# copy library files neeeded by OMPython
-	(cp -puf $(OMDEV)/lib/omniORB-4.1.6-msvc-10/lib/x86_win32/_omnipy.pyd $(builddir_lib)/python)
-	(cp -puf $(OMDEV)/lib/omniORB-4.1.6-msvc-10/lib/python/omniORB/__init__.py $(builddir_lib)/python/omniORB/)
-	(cp -puf $(OMDEV)/lib/omniORB-4.1.6-msvc-10/lib/python/omniORB/boxes_idl.py $(builddir_lib)/python/omniORB/)
-	(cp -puf $(OMDEV)/lib/omniORB-4.1.6-msvc-10/lib/python/omniORB/CORBA.py $(builddir_lib)/python/omniORB/)
-	(cp -puf $(OMDEV)/lib/omniORB-4.1.6-msvc-10/lib/python/omniORB/corbaidl_idl.py $(builddir_lib)/python/omniORB/)
-	(cp -puf $(OMDEV)/lib/omniORB-4.1.6-msvc-10/lib/python/omniORB/minorCodes.py $(builddir_lib)/python/omniORB/)
-	(cp -puf $(OMDEV)/lib/omniORB-4.1.6-msvc-10/lib/python/omniORB/PortableServer.py $(builddir_lib)/python/omniORB/)
-	(cp -puf $(OMDEV)/lib/omniORB-4.1.6-msvc-10/lib/python/omniORB/tcInternal.py $(builddir_lib)/python/omniORB/)
+	(cp -puf $(OMDEV)/lib/omniORB-4.2.0-msvc-10/lib/x86_win32/_omnipy.pyd $(builddir_lib)/python)
+	(cp -puf $(OMDEV)/lib/omniORB-4.2.0-msvc-10/lib/python/omniORB/__init__.py $(builddir_lib)/python/omniORB/)
+	(cp -puf $(OMDEV)/lib/omniORB-4.2.0-msvc-10/lib/python/omniORB/boxes_idl.py $(builddir_lib)/python/omniORB/)
+	(cp -puf $(OMDEV)/lib/omniORB-4.2.0-msvc-10/lib/python/omniORB/CORBA.py $(builddir_lib)/python/omniORB/)
+	(cp -puf $(OMDEV)/lib/omniORB-4.2.0-msvc-10/lib/python/omniORB/corbaidl_idl.py $(builddir_lib)/python/omniORB/)
+	(cp -puf $(OMDEV)/lib/omniORB-4.2.0-msvc-10/lib/python/omniORB/minorCodes.py $(builddir_lib)/python/omniORB/)
+	(cp -puf $(OMDEV)/lib/omniORB-4.2.0-msvc-10/lib/python/omniORB/PortableServer.py $(builddir_lib)/python/omniORB/)
+	(cp -puf $(OMDEV)/lib/omniORB-4.2.0-msvc-10/lib/python/omniORB/tcInternal.py $(builddir_lib)/python/omniORB/)
 	# copy OMPython files
 	cp -rfp OMPython/setup.py $(builddir_share)/omc/scripts/PythonInterface
 	cp -rfp OMPython/OMPython/* $(builddir_share)/omc/scripts/PythonInterface/OMPython
@@ -104,7 +115,7 @@ mkbuilddirs-python:
 
 modelica3d:
 	cd libraries/git/Modelica3D && mkdir -p build
-	cd libraries/git/Modelica3D/build && $(CMAKE) -DCMAKE_COLOR_MAKEFILE:Bool=OFF -DOSG_BACKEND=1 -DDBUS_INCLUDE_DIR=$(DBUS_INCLUDE_DIR) -DDBUS_INCLUDE_LIB_DIR=$(DBUS_INCLUDE_LIB_DIR) -DDBUS_LIBRARY=$(DBUS_PATH) -DBOOST_ROOT=$(BOOST_PATH) -DCMAKE_PREFIX_PATH=$(OSG_PATH) -DCMAKE_PROGRAM_PATH=$(PKG_CONFIG_PATH) -DUSE_OMC=0 .. -G $(CMAKE_TARGET)
+	cd libraries/git/Modelica3D/build && $(CMAKE) -DCMAKE_VERBOSE_MAKEFILE:Bool=ON -DCMAKE_COLOR_MAKEFILE:Bool=OFF -DOSG_BACKEND=1 -DDBUS_INCLUDE_DIR=$(DBUS_INCLUDE_DIR) -DDBUS_INCLUDE_LIB_DIR=$(DBUS_INCLUDE_LIB_DIR) -DDBUS_LIBRARY=$(DBUS_PATH) -DBOOST_ROOT=$(BOOST_PATH) -DCMAKE_PREFIX_PATH=$(OSG_PATH) -DCMAKE_PROGRAM_PATH=$(PKG_CONFIG_BIN) -DPKG_CONFIG_PATH=$(PKG_CONFIG_PATH) -DUSE_OMC=0 .. -G $(CMAKE_TARGET)
 	$(MAKE) -C libraries/git/Modelica3D/build
 	cp -p libraries/git/Modelica3D/build/lib/modcount/libmodcount.a libraries/git/Modelica3D/build/lib/modbus/libmodbus.a $(OMBUILDDIR)/lib/omc/
 	mkdir -p $(OMBUILDDIR)/lib/omlibrary-modelica3d/blender2.59 $(OMBUILDDIR)/lib/omlibrary-modelica3d/osg-gtk/dbus-python/etc
@@ -125,10 +136,18 @@ modelica3d:
 	mkdir -p  $(OMBUILDDIR)/lib/omlibrary-modelica3d/osg-gtk/osgPlugins-2.8.3
 	cp -p -u $(OMDEV)/lib/openscenegraph-2.8.3-mingw/bin/*.dll $(OMBUILDDIR)/lib/omlibrary-modelica3d/osg-gtk/
 	cp -p -u $(OMDEV)/lib/openscenegraph-2.8.3-mingw/bin/osgPlugins-2.8.3/*.dll $(OMBUILDDIR)/lib/omlibrary-modelica3d/osg-gtk/osgPlugins-2.8.3/
-	
+
 clean-python:
 	rm -rf OMPython/build/ OMPython/OMPythonIDL/ OMPython/OMPython/_GlobalID* OMPython/OMPython/omc_communication_idl.py
 
 clean:
 	$(MAKE) -f $(defaultMakefileTarget) -C OMCompiler clean OMBUILDDIR=$(OMBUILDDIR)
 	test ! -d $(OMBUILDDIR) || rm -rf $(OMBUILDDIR)
+
+LIBGITDIRS = `ls libraries/git`
+	
+gitclean:
+	git submodule foreach --recursive 'git clean -fdx -e /git -e /svn'
+	git clean -fdx -e OpenModelicaSetup -e .project -e .externalToolBuilders/OMDev-MINGW-OpenModelicaBuilder.launch
+	for d in $(LIBGITDIRS); do git clean -fdx libraries/git/$$d; done
+
