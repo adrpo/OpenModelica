@@ -20,6 +20,9 @@ BOOST_PATH = $(OMDEV)/tools/msys/mingw64/include
 OSG_PATH = $(OMDEV)/tools/msys/mingw64/
 PKG_CONFIG_PATH=$(OMDEV)/tools/msys/mingw64/lib/pkgconfig
 endif
+ifeq ($(BUILDTYPE),)
+BUILDTYPE=Debug
+endif
 
 .PHONY: omc omc-diff omlibrary-core omplot omedit omnotebook omshell omoptim modelica3d
 
@@ -63,13 +66,13 @@ simulationruntimecmsvc:
 	$(MAKE) -C OMCompiler -f $(defaultMakefileTarget) OMBUILDDIR=$(OMBUILDDIR) simulationruntimecmsvc
 
 runtimeCPPmsvcinstall:
-	$(MAKE) -C OMCompiler -f $(defaultMakefileTarget) OMBUILDDIR=$(OMBUILDDIR) runtimeCPPmsvcinstall
+	$(MAKE) -C OMCompiler -f $(defaultMakefileTarget) OMBUILDDIR=$(OMBUILDDIR) BUILDTYPE=$(BUILDTYPE) runtimeCPPmsvcinstall
 
 runtimeCPPinstall:
-	$(MAKE) -C OMCompiler -f $(defaultMakefileTarget) OMBUILDDIR=$(OMBUILDDIR) runtimeCPPinstall
+	$(MAKE) -C OMCompiler -f $(defaultMakefileTarget) OMBUILDDIR=$(OMBUILDDIR) BUILDTYPE=$(BUILDTYPE) runtimeCPPinstall
 
 testlogwindows:
-	$(MAKE) -C testsuite -f Makefile ReferenceFiles
+	$(MAKE) -C testsuite -f Makefile ReferenceFiles > testsuite/testsuite-trace.txt
 	(time $(MAKE) -C testsuite -f Makefile 2>&1 | tee testsuite/testsuite-trace.txt) || true
 	(time $(MAKE) -C testsuite/openmodelica/cruntime/msvc/ -f Makefile >> testsuite/testsuite-trace.txt 2>&1) || true
 	(export RTEST_OMCFLAGS=+target=msvc ; time $(MAKE) -C testsuite/openmodelica/cppruntime/ -f Makefile >> testsuite/testsuite-trace.txt 2>&1) || true
@@ -144,10 +147,9 @@ clean:
 	$(MAKE) -f $(defaultMakefileTarget) -C OMCompiler clean OMBUILDDIR=$(OMBUILDDIR)
 	test ! -d $(OMBUILDDIR) || rm -rf $(OMBUILDDIR)
 
-LIBGITDIRS = `ls libraries/git`
+LIBGITDIRS = `ls -f libraries/git`
 	
 gitclean:
 	git submodule foreach --recursive 'git clean -fdx -e /git -e /svn'
 	git clean -fdx -e OpenModelicaSetup -e .project -e .externalToolBuilders/OMDev-MINGW-OpenModelicaBuilder.launch
 	for d in $(LIBGITDIRS); do git clean -fdx libraries/git/$$d; done
-
