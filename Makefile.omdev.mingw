@@ -102,8 +102,7 @@ ifeq (MINGW32,$(findstring MINGW32,$(shell uname)))
 	cp -puf $(OMDEV)/tools/msys/mingw32/bin/libicudt56.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw32/bin/libpcre16-0.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw32/bin/libharfbuzz-0.dll $(builddir_bin)/
-	mkdir -p $(builddir_bin)/iconengines/
-	cp -puf $(OMDEV)/tools/msys/mingw32/share/qt5/plugins/iconengines/qsvgicon.dll $(builddir_bin)/iconengines/
+	cp -pufr $(OMDEV)/tools/msys/mingw32/share/qt5/plugins/* $(builddir_bin)/
 else # mingw64
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/libgcc_s*.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/libintl-8.dll $(builddir_bin)/
@@ -143,8 +142,7 @@ else # mingw64
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/libicudt56.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/libpcre16-0.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/libharfbuzz-0.dll $(builddir_bin)/
-	mkdir -p $(builddir_bin)/iconengines/
-	cp -puf $(OMDEV)/tools/msys/mingw64/share/qt5/plugins/iconengines/qsvgicon.dll $(builddir_bin)/iconengines/
+	cp -pufr $(OMDEV)/tools/msys/mingw64/share/qt5/plugins/* $(builddir_bin)/
 endif
 
 clean-qtclients:
