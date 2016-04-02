@@ -87,6 +87,7 @@ ifeq (MINGW32,$(findstring MINGW32,$(shell uname)))
 	cp -puf $(OMDEV)/tools/msys/mingw32/bin/Qt5Sql.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw32/bin/Qt5OpenGL.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw32/bin/libxslt-1.dll $(builddir_bin)/
+	cp -puf $(OMDEV)/tools/msys/mingw32/bin/libpcre-1.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw32/bin/liblzma-5.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw32/bin/libxml2-2.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw32/bin/libwebp-6.dll $(builddir_bin)/
@@ -126,6 +127,7 @@ else # mingw64
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/Qt5WebChannel.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/Qt5Sql.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/Qt5OpenGL.dll $(builddir_bin)/
+	cp -puf $(OMDEV)/tools/msys/mingw64/bin/libpcre-1.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/libxslt-1.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/liblzma-5.dll $(builddir_bin)/
 	cp -puf $(OMDEV)/tools/msys/mingw64/bin/libxml2-2.dll $(builddir_bin)/
