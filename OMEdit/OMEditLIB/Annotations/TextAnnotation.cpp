@@ -59,7 +59,7 @@ TextAnnotation::TextAnnotation(QString annotation, GraphicsView *pGraphicsView)
   setShapeFlags(true);
 }
 
-TextAnnotation::TextAnnotation(ShapeAnnotation *pShapeAnnotation, Component *pParent)
+TextAnnotation::TextAnnotation(ShapeAnnotation *pShapeAnnotation, Element *pParent)
   : ShapeAnnotation(pShapeAnnotation, pParent), mpComponent(pParent)
 {
   updateShape(pShapeAnnotation);
@@ -77,7 +77,7 @@ TextAnnotation::TextAnnotation(ShapeAnnotation *pShapeAnnotation, GraphicsView *
   mpGraphicsView->addItem(this);
 }
 
-TextAnnotation::TextAnnotation(Component *pParent)
+TextAnnotation::TextAnnotation(Element *pParent)
   : ShapeAnnotation(0, pParent), mpComponent(pParent)
 {
   // set the default values
@@ -369,8 +369,8 @@ void TextAnnotation::drawTextAnnotaion(QPainter *painter)
     painter->setFont(font);
   }
   /* Get the elided text
-   * Try to get the elided text if the shape is inside a Component
-   * If the shape is not part of Component then only try to get the elided text if its font size <= Helper::minimumTextFontSize
+   * Try to get the elided text if the shape is inside a component
+   * If the shape is not part of component then only try to get the elided text if its font size <= Helper::minimumTextFontSize
    */
   QString textToDraw = mTextString;
   if (absMappedBoundingRect.width() > 1 && painter->font().pointSizeF() <= Helper::minimumTextFontSize) {
@@ -534,13 +534,13 @@ void TextAnnotation::updateTextStringHelper(QRegExp regExp)
       if (!variable.isEmpty()) {
         QString textValue;
         /* Ticket:4204
-         * If we have extend component then call Component::getParameterDisplayString from root component.
+         * If we have extend component then call Element::getParameterDisplayString from root component.
          */
         textValue = mpComponent->getRootParentComponent()->getParameterDisplayString(variable);
         if (!textValue.isEmpty()) {
           QString unit = "";
           QString displaytUnit = "";
-          Component *pComponent = mpComponent->getRootParentComponent()->getComponentByName(variable);
+          Element *pComponent = mpComponent->getRootParentComponent()->getComponentByName(variable);
           if (pComponent) {
             displaytUnit = pComponent->getDerivedClassModifierValue("displaytUnit");
             if (displaytUnit.isEmpty()) {
