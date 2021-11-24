@@ -51,6 +51,16 @@
 extern "C" {
 #endif
 
+#if defined(_MSC_VER) || defined(__MINGW32__)
+#if defined(OMC_EXPORT_DLL)
+#define OMC_DLLEXPORT __declspec(dllexport)
+#else
+#define OMC_DLLEXPORT __declspec(dllimport)
+#endif
+#else
+#define OMC_DLLEXPORT
+#endif
+
 /*
   Some of the functions never return to the caller. In order to compile
   external Modelica C-code in most compilers, noreturn attributes need to
@@ -126,24 +136,29 @@ extern "C" {
 #define MODELICA_FORMATATTR_VPRINTF
 #endif
 
+
+OMC_DLLEXPORT
 void ModelicaMessage(const char *string);
 /*
 Output the message string (no format control).
 */
 
 
+OMC_DLLEXPORT
 void ModelicaFormatMessage(const char *string, ...) MODELICA_FORMATATTR_PRINTF;
 /*
 Output the message under the same format control as the C-function printf.
 */
 
 
+OMC_DLLEXPORT
 void ModelicaVFormatMessage(const char *string, va_list args) MODELICA_FORMATATTR_VPRINTF;
 /*
 Output the message under the same format control as the C-function vprintf.
 */
 
 
+OMC_DLLEXPORT
 MODELICA_NORETURN void ModelicaError(const char *string) MODELICA_NORETURNATTR;
 /*
 Output the error message string (no format control). This function
@@ -151,21 +166,25 @@ never returns to the calling function, but handles the error
 similarly to an assert in the Modelica code.
 */
 
+OMC_DLLEXPORT
 void ModelicaWarning(const char *string);
 /*
 Output the warning message string (no format control).
 */
 
+OMC_DLLEXPORT
 void ModelicaFormatWarning(const char *string, ...) MODELICA_FORMATATTR_PRINTF;
 /*
 Output the warning message under the same format control as the C-function printf.
 */
 
+OMC_DLLEXPORT
 void ModelicaVFormatWarning(const char *string, va_list args) MODELICA_FORMATATTR_VPRINTF;
 /*
 Output the warning message under the same format control as the C-function vprintf.
 */
 
+OMC_DLLEXPORT
 MODELICA_NORETURN void ModelicaFormatError(const char *string, ...) MODELICA_NORETURNATTR MODELICA_FORMATATTR_PRINTF;
 /*
 Output the error message under the same format control as the C-function
@@ -174,6 +193,7 @@ but handles the error similarly to an assert in the Modelica code.
 */
 
 
+OMC_DLLEXPORT
 MODELICA_NORETURN void ModelicaVFormatError(const char *string, va_list args) MODELICA_NORETURNATTR MODELICA_FORMATATTR_VPRINTF;
 /*
 Output the error message under the same format control as the C-function
@@ -182,6 +202,7 @@ but handles the error similarly to an assert in the Modelica code.
 */
 
 
+OMC_DLLEXPORT
 char* ModelicaAllocateString(size_t len);
 /*
 Allocate memory for a Modelica string which is used as return
@@ -192,6 +213,7 @@ function does not return, but calls "ModelicaError".
 */
 
 
+OMC_DLLEXPORT
 char* ModelicaAllocateStringWithErrorReturn(size_t len);
 /*
 Same as ModelicaAllocateString, except that in case of error, the

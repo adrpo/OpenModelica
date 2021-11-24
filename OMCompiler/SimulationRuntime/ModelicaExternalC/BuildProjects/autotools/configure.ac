@@ -9,10 +9,11 @@ AC_LANG([C])
 AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_MAKE_SET
-LT_INIT([disable-static])
+LT_INIT([shared static win32-dll])
 AC_SUBST(LIBZLIB)
 AC_SUBST(LIBHDF5)
 AC_SUBST(LIBMATH)
+AC_SUBST(LIBMODELICAUTILITIESIMPORT)
 dnl Check for HDF5, etc
 
 LIBS_BEFORE="$LIBS"
@@ -177,5 +178,19 @@ if test "$libdir" = '${exec_prefix}/lib'; then
   # Use Resources/Library/ as the default.
   libdir=`pwd`/../../Library/
 fi
+
+
+AC_MSG_CHECKING([add import lib on mingw])
+case "`uname`" in
+CYGWIN*|MINGW*)
+AC_MSG_RESULT([yes])
+LIBMODELICAUTILITIESIMPORT="libModelicaUtilitiesImport.la"
+;;
+*)
+## Don't add in anything.
+AC_MSG_RESULT([no])
+LIBMODELICAUTILITIESIMPORT=""
+;;
+esac
 
 AC_OUTPUT([Makefile])
