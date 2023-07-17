@@ -7701,7 +7701,7 @@ algorithm
     BackendDump.dumpLoops(outSimDAE);
     print("\n" + BackendDump.BORDER + "\n\n Algbraic Loops (Initialization): \n\n" + BackendDump.BORDER + "\n");
     BackendDump.dumpLoops(outInitDAE);
-    if Flags.isSet(Flags.DUMP_LOOPS_VERBOSE) and isSome(outInitDAE_lambda0_option) then
+    if isSome(outInitDAE_lambda0_option) then
       print("\n" + BackendDump.BORDER + "\n\n Algbraic Loops (Initialization Lambda=0 (Homotopy)): \n\n" + BackendDump.BORDER + "\n");
       BackendDump.dumpLoops(Util.getOption(outInitDAE_lambda0_option));
     end if;
@@ -8602,10 +8602,6 @@ algorithm
       disabledModules := "removeSimpleEquations"::disabledModules;
     end if;
 
-    if Config.getTearingMethod() == "noTearing" then
-      disabledModules := "tearingSystem"::disabledModules;
-    end if;
-
     if not Flags.isSet(Flags.NF_SCALARIZE) then
       disabledModules := "inlineArrayEqn"::disabledModules;
     end if;
@@ -8648,9 +8644,6 @@ algorithm
     end if;
 
     // handle special flags, which disable modules
-    if Config.getTearingMethod() == "noTearing" then
-      disabledModules := "tearingSystem"::disabledModules;
-    end if;
   end if;
 
   if not Flags.getConfigBool(Flags.DEFAULT_OPT_MODULES_ORDERING) and not listEmpty(enabledModules) then

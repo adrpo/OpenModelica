@@ -830,7 +830,14 @@ public
     exp := match exp
       // Integer can be cast to Real.
       case INTEGER()
-        then if Type.isReal(ety) then REAL(intReal(exp.value)) else typeCastGeneric(exp, ety);
+        then if Type.isReal(ety) then REAL(intReal(exp.value))
+             elseif Type.isEnumeration(ety) and Flags.isConfigFlagSet(Flags.ALLOW_NON_STANDARD_MODELICA, "nonStdIntegersAsEnumeration") // Integer can be cast to Enumeration with non-standard Modelica
+             then ENUM_LITERAL(ety, Type.nthEnumLiteral(ety, exp.value), exp.value)
+             else typeCastGeneric(exp, ety);
+
+      // Enumeration can be cast to Integer with non-standard Modelica
+      case ENUM_LITERAL() guard Flags.isConfigFlagSet(Flags.ALLOW_NON_STANDARD_MODELICA, "nonStdEnumerationAsIntegers")
+        then if Type.isInteger(ety) then INTEGER(toInteger(exp)) else typeCastGeneric(exp, ety);
 
       // Boolean can be cast to Real (only if -d=nfAPI is on)
       // as there are annotations having expressions such as Boolean x > 0.5
@@ -1120,12 +1127,7 @@ public
 
   function rangeSize
     input Expression range  "has to be RANGE()!";
-    output Integer size;
-  protected
-    Integer start, step, stop;
-  algorithm
-    (start, step, stop) := getIntegerRange(range);
-    size := realInt((stop - start + 1) / step);
+    output Integer size = Dimension.size(Type.nthDimension(typeOf(range), 1));
   end rangeSize;
 
   function applySubscripts

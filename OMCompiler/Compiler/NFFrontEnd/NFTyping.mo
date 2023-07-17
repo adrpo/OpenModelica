@@ -309,7 +309,7 @@ protected
 algorithm
   if isExpandable then
     for c in ClassTree.enumerateComponents(ctree) loop
-      cty := Component.connectorType(InstNode.component(c));
+      cty := Component.connectorType(InstNode.component(InstNode.resolveInner(c)));
 
       if intBitAnd(cty, ConnectorType.EXPANDABLE) > 0 then
         exps := c :: exps;
@@ -321,7 +321,7 @@ algorithm
     connectorTy := ComplexType.EXPANDABLE_CONNECTOR(pots, exps);
   else
     for c in ClassTree.enumerateComponents(ctree) loop
-      cty := Component.connectorType(InstNode.component(c));
+      cty := Component.connectorType(InstNode.component(InstNode.resolveInner(c)));
 
       if intBitAnd(cty, ConnectorType.FLOW) > 0 then
         flows := c :: flows;
@@ -2048,7 +2048,7 @@ function typeSubscript
   output Subscript outSubscript = subscript;
   output Variability variability = Variability.CONSTANT;
 protected
-  Expression e;
+  Expression e = Expression.EMPTY(Type.UNKNOWN());
   Type ty, ety;
   MatchKind mk;
 algorithm
@@ -2085,8 +2085,12 @@ algorithm
 
   // Type check the subscript's type against the expected subscript type for the dimension.
   ety := Dimension.subscriptType(dimension);
+  e := match e
+    case Expression.EMPTY() then Expression.EMPTY(ty);
+    else e;
+  end match;
   // We can have both : subscripts and : dimensions here, so we need to allow unknowns.
-  (_, _, mk) := TypeCheck.matchTypes(ty, ety, Expression.EMPTY(ty), allowUnknown = true);
+  (_, _, mk) := TypeCheck.matchTypes(ty, ety, e, allowUnknown = true);
 
   if TypeCheck.isIncompatibleMatch(mk) then
     Error.addSourceMessage(Error.SUBSCRIPT_TYPE_MISMATCH,
