@@ -53,7 +53,9 @@
 #include <QTcpSocket>
 #include <QMessageBox>
 
+extern "C" {
 extern const char* System_openModelicaPlatform();
+}
 
 /*!
  * \class SimulationOutputTree
