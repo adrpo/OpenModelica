@@ -25,6 +25,7 @@ ExternalProject_Add(OMSimulator_external
                                                 OMTLM=OFF
                                                 BUILD_TYPE=${CMAKE_BUILD_TYPE}
                                                 OMSYSIDENT=OFF
+                                                OMTLM=OFF
                                                 OMBUILDDIR=${CMAKE_CURRENT_BINARY_DIR}/OMSimulator
                                                 host_short=${CMAKE_LIBRARY_ARCHITECTURE}
                                                 CMAKE="${CMAKE_COMMAND}"
