@@ -638,7 +638,8 @@ bool VariablesTreeModel::removeVariableTreeItem(QString variable)
       mpVariablesTreeView->getVariablesWidget()->rewindVisualization();
       mpVariablesTreeView->getVariablesWidget()->closeResultFile();
     }
-    beginRemoveRows(variablesTreeItemIndex(pVariablesTreeItem->parent()), 0, pVariablesTreeItem->mChildren.size());
+    int row = pVariablesTreeItem->row();
+    beginRemoveRows(variablesTreeItemIndex(pVariablesTreeItem->parent()), row, row);
     pVariablesTreeItem->removeChildren();
     VariablesTreeItem *pParentVariablesTreeItem = pVariablesTreeItem->parent();
     pParentVariablesTreeItem->removeChild(pVariablesTreeItem);
@@ -1590,8 +1591,8 @@ void VariablesWidget::variablesUpdated()
           QString curveNameStructure = pPlotCurve->getNameStructure();
           VariablesTreeItem *pVariableTreeItem;
           pVariableTreeItem = mpVariablesTreeModel->findVariablesTreeItem(curveNameStructure, mpVariablesTreeModel->getRootVariablesTreeItem());
-          pPlotCurve->detach();
           if (pVariableTreeItem) {
+            pPlotCurve->detach();
             bool state = mpVariablesTreeModel->blockSignals(true);
             QModelIndex index = mpVariablesTreeModel->variablesTreeItemIndex(pVariableTreeItem);
             mpVariablesTreeModel->setData(index, Qt::Checked, Qt::CheckStateRole);
@@ -1599,6 +1600,7 @@ void VariablesWidget::variablesUpdated()
             mpVariablesTreeModel->blockSignals(state);
           } else {
             pPlotWindow->getPlot()->removeCurve(pPlotCurve);
+            pPlotCurve->detach();
           }
         } else if (pPlotWindow->getPlotType() == PlotWindow::PLOTPARAMETRIC || pPlotWindow->getPlotType() == PlotWindow::PLOTARRAYPARAMETRIC) {
           QString xVariable = QString(pPlotCurve->getFileName()).append(".").append(pPlotCurve->getXVariable());
@@ -1607,8 +1609,8 @@ void VariablesWidget::variablesUpdated()
           QString yVariable = QString(pPlotCurve->getFileName()).append(".").append(pPlotCurve->getYVariable());
           VariablesTreeItem *pYVariableTreeItem;
           pYVariableTreeItem = mpVariablesTreeModel->findVariablesTreeItem(yVariable, mpVariablesTreeModel->getRootVariablesTreeItem());
-          pPlotCurve->detach();
           if (pXVariableTreeItem && pYVariableTreeItem) {
+            pPlotCurve->detach();
             bool state = mpVariablesTreeModel->blockSignals(true);
             QModelIndex xIndex = mpVariablesTreeModel->variablesTreeItemIndex(pXVariableTreeItem);
             mpVariablesTreeModel->setData(xIndex, Qt::Checked, Qt::CheckStateRole);
@@ -1619,6 +1621,7 @@ void VariablesWidget::variablesUpdated()
             mpVariablesTreeModel->blockSignals(state);
           } else {
             pPlotWindow->getPlot()->removeCurve(pPlotCurve);
+            pPlotCurve->detach();
           }
         }
       }

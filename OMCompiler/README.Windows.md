@@ -141,7 +141,7 @@ Start `C:\OMDev\tools\msys64\ucrt64.exe` and run:
 # note: if you have a space in your path to your tool you need to escape it, i.e.: /c/Program\ Files
 export PATH=$PATH:/c/path/to/git/bin:/c/path/to/svn/tools/bin:/c/path/to/jdk/bin
 export OPENMODELICAHOME="C:\\path\\to\\OpenModelica\\build"
-export OPENMODELICALIBRARY="C:\\path\\to\\OpenModelica\\build\\lib\\omlibrary"
+export OPENMODELICALIBRARY="C:\\Users\\<user name>\\AppData\\Roaming\\.openmodelica\\libraries"
 export OMDEV="C:\\OMDev"
 export OMDEV_MSYS="C:\\OMDev\\tools\\msys64"
 ```
