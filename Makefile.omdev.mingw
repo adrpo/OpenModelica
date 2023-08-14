@@ -230,8 +230,4 @@ clean:
 
 gitclean:
 	git submodule foreach --recursive 'git clean -fdx -e /git -e /svn'
-<<<<<<< HEAD
 	git clean -fdx -e OpenModelicaSetup -e OMSetup -e OMEncryption -e .project -e *.launch -e .vscode/
-=======
-	git clean -fdx -e OpenModelicaSetup -e OMSetup -e OMEncryption -e .project -e *.launch -e .vscode
->>>>>>> origin/master
