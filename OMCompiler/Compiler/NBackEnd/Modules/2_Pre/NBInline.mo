@@ -93,6 +93,8 @@ public
 //                    TYPES, UNIONTYPES AND MEMBER FUNCTIONS
 // =========================================================================
   function inlineForEquation
+    "inlines for-equations of size 1 to its body equation by replacing
+    the iterators by the only values they are ever going to be."
     input output Equation eqn;
   algorithm
     eqn := match eqn
@@ -124,6 +126,21 @@ public
     end match;
   end inlineForEquation;
 
+  function functionInlineable
+    "returns true if the function can be inlined"
+    input Function fn;
+    output Boolean b = false;
+  algorithm
+    // currently we only inline single assignments
+    // also check for single output?
+    if Function.hasSingleOrEmptyBody(fn) then
+      b := match Function.getBody(fn)
+        case {Statement.ASSIGNMENT()} then true;
+        else false;
+      end match;
+    end if;
+  end functionInlineable;
+
 protected
   function inline extends Module.inlineInterface;
   protected
@@ -135,6 +152,8 @@ protected
 
     // apply replacements
     eqData := Replacements.replaceFunctions(eqData, replacements);
+    // replace record constucters after functions because record operator
+    // functions will produce record constructors once inlined
     eqData := inlineRecords(eqData, VarData.getVariables(varData));
   end inline;
 
@@ -151,21 +170,6 @@ protected
       UnorderedMap.add(key, value, replacements);
     end if;
   end collectInlineFunctions;
-
-  function functionInlineable
-    "returns true if the function can be inlined"
-    input Function fn;
-    output Boolean b = false;
-  algorithm
-    // currently we only inline single assignments
-    // also check for single output?
-    if Function.hasSingleOrEmptyBody(fn) then
-      b := match Function.getBody(fn)
-        case {Statement.ASSIGNMENT()} then true;
-        else false;
-      end match;
-    end if;
-  end functionInlineable;
 
   function inlineRecords
     input output EqData eqData;
@@ -199,10 +203,9 @@ protected
       // try to inline other record equations. try catch to be sure to not discard
       case Equation.RECORD_EQUATION() algorithm
         try
-          if Flags.isSet(Flags.DUMPBACKENDINLINE) then
-            print("[" + getInstanceName() + "] Inlining: " + Equation.toString(eqn) + "\n");
-          end if;
+          if Flags.isSet(Flags.DUMPBACKENDINLINE) then print("[" + getInstanceName() + "] Inlining: " + Equation.toString(eqn) + "\n"); end if;
           new_eqn := inlineRecordEquationWork(eqn.lhs, eqn.rhs, eqn.attr, eqn.source, eqn.recordSize, variables, record_eqns, index);
+          if Flags.isSet(Flags.DUMPBACKENDINLINE) then print("\n"); end if;
         else
           // inlining failed, keep old equation
           new_eqn := eqn;

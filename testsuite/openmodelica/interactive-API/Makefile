@@ -17,6 +17,7 @@ Bug4209.mos \
 Bug4248.mos \
 Buildings.PartialFlowMachine.mos \
 checkAllModelsRecursive1.mos \
+CheckModelExtObj1.mos \
 choicesAllMatching.mos \
 ConnectionList.mos \
 ConversionVersions.mos \
@@ -44,6 +45,7 @@ getComponentsTestNF.mos \
 getComponentsTestOF.mos \
 getDefinitions.mos \
 getDialogAnnotation.mos \
+getElementAnnotation.mos \
 getIconAnnotation.mos \
 IfStatementIllegal.mos \
 IfStatement.mos\
@@ -84,6 +86,7 @@ saveShort.mos \
 saveTotalModel.mos \
 setComponentComment.mos \
 setComponentModifierValue.mos \
+setElementAnnotation.mos \
 setElementModifierValue.mos \
 setExtendsModifierValue.mos \
 setSourceFileListFile.mos \

@@ -1,6 +1,7 @@
 TEST = ../../rtest -v
 
 TESTFILES = \
+GetModelInstanceAlgorithm1.mos \
 GetModelInstanceAnnotation1.mos \
 GetModelInstanceAnnotation2.mos \
 GetModelInstanceAnnotation3.mos \
@@ -18,6 +19,7 @@ GetModelInstanceBinding3.mos \
 GetModelInstanceBinding4.mos \
 GetModelInstanceBinding5.mos \
 GetModelInstanceBinding6.mos \
+GetModelInstanceBinding7.mos \
 GetModelInstanceChoices1.mos \
 GetModelInstanceChoices2.mos \
 GetModelInstanceComment1.mos \
@@ -25,9 +27,12 @@ GetModelInstanceConditional1.mos \
 GetModelInstanceConditional2.mos \
 GetModelInstanceConnection1.mos \
 GetModelInstanceConnection2.mos \
+GetModelInstanceConnection3.mos \
 GetModelInstanceDerived1.mos \
 GetModelInstanceDerived2.mos \
 GetModelInstanceDerived3.mos \
+GetModelInstanceDim1.mos \
+GetModelInstanceDim2.mos \
 GetModelInstanceDuplicate1.mos \
 GetModelInstanceEnum1.mos \
 GetModelInstanceEnum2.mos \
@@ -47,6 +52,7 @@ GetModelInstanceInnerOuter3.mos \
 GetModelInstanceInnerOuter4.mos \
 GetModelInstanceMissingClass1.mos \
 GetModelInstanceMissingClass2.mos \
+GetModelInstanceMissingClass3.mos \
 GetModelInstanceMod1.mos \
 GetModelInstanceMod2.mos \
 GetModelInstanceMod3.mos \

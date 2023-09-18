@@ -47,6 +47,7 @@ protected
   import Prefixes = NFPrefixes;
   import MetaModelica.Dangerous.*;
   import JSON;
+  import Variable = NFVariable;
 
   import ComponentRef = NFComponentRef;
 
@@ -388,6 +389,23 @@ public
     end match;
   end append;
 
+  function appendScope
+    "Appends the instance scope of the given node to a component reference, as
+     defined by InstNode.scopeList."
+    input InstNode scope;
+    input output ComponentRef cref;
+    input Boolean includeRoot = false "Whether to include the root class name or not.";
+  protected
+    ComponentRef prefix;
+  algorithm
+    prefix := fromNodeList(InstNode.scopeList(scope, includeRoot));
+
+    if not ComponentRef.isEmpty(prefix) then
+      cref := append(cref, prefix);
+      cref := removeOuterCrefPrefix(cref);
+    end if;
+  end appendScope;
+
   function prepend
     input ComponentRef restCref;
     input output ComponentRef cref;
@@ -453,9 +471,12 @@ public
     output Variability var;
   algorithm
     var := match cref
+      local
+        Pointer<Variable> v;
       case CREF(node = InstNode.COMPONENT_NODE())
         then Component.variability(InstNode.component(cref.node));
       case CREF(node = InstNode.CLASS_NODE()) then Variability.CONSTANT;
+      case CREF(node = InstNode.VAR_NODE(varPointer = v)) then Variable.variability(Pointer.access(v));
       else Variability.CONTINUOUS;
     end match;
   end nodeVariability;
@@ -2094,7 +2115,7 @@ public
                   case Subscript.WHOLE()
                     then Expression.makeRange(Dimension.lowerBoundExp(dim),
                                               NONE(),
-                                              Dimension.endExp(dim, cref, dim_index));
+                                              Dimension.endExp(dim, Expression.CREF(cref.ty, cref), dim_index));
                 end match;
 
                 iterator := InstNode.newIndexedIterator(iter_index);

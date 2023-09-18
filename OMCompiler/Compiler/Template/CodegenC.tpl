@@ -330,7 +330,7 @@ template functionInitSynchronous(list<ClockedPartition> clockedPartitions, Strin
   void <%symbolName(modelNamePrefix,"function_initSynchronous")%>(DATA *data, threadData_t *threadData)
   {
     TRACE_PUSH
-    assertStreamPrint(threadData, data->modelData->nBaseClocks==<%listLength(clockedPartitions)%>, "Number of base clocks doens't match numer of clocks that are initialized! Code generation error!");
+    assertStreamPrint(threadData, data->modelData->nBaseClocks==<%listLength(clockedPartitions)%>, "Number of base clocks doesn't match number of clocks that are initialized! Code generation error!");
     data->simulationInfo->baseClocks = calloc(<%listLength(clockedPartitions)%>, sizeof(BASECLOCK_DATA));
 
     <%body%>
@@ -2418,13 +2418,6 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
               >>
             case SES_FOR_RESIDUAL(__) then "case 1"
           ;separator="\n")
-         let body_initializeStaticLSData = (ls.vars |> var hasindex i0 =>
-           <<
-           /* static ls data for <%crefStrNoUnderscore(varName(var))%> */
-           linearSystemData->nominal[i] = <%varAttributes(var, &sub)%>.nominal;
-           linearSystemData->min[i]     = <%varAttributes(var, &sub)%>.min;
-           linearSystemData->max[i++]   = <%varAttributes(var, &sub)%>.max;
-           >> ;separator="\n")
        <<
        <%auxFunction%>
        <%tmp%>
@@ -2449,11 +2442,7 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
          TRACE_POP
        }
        OMC_DISABLE_OPT
-       void initializeStaticLSData<%ls.index%>(DATA* data, threadData_t* threadData, LINEAR_SYSTEM_DATA* linearSystemData, modelica_boolean initSparsePattern)
-       {
-         int i=0;
-         <%body_initializeStaticLSData%>
-       }
+       <%initializeStaticLSVars(ls.vars, ls.index)%>
        >>
        else
          let &varDecls = buffer "" /*BUFD*/
@@ -2472,13 +2461,6 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
            let expPart = daeExp(exp, contextSimulationDiscrete, &preExp, &varDecls2, &auxFunction)
              '<%preExp%>linearSystemData->setBElement(<%i0%>, <%expPart%>, linearSystemData, threadData);'
           ;separator="\n")
-         let body_initializeStaticLSData = (ls.vars |> var hasindex i0 =>
-           <<
-           /* static ls data for <%crefStrNoUnderscore(varName(var))%> */
-           linearSystemData->nominal[i] = <%varAttributes(var, &sub)%>.nominal;
-           linearSystemData->min[i]     = <%varAttributes(var, &sub)%>.min;
-           linearSystemData->max[i++]   = <%varAttributes(var, &sub)%>.max;
-           >> ;separator="\n")
        <<
        <%auxFunction%>
        OMC_DISABLE_OPT
@@ -2498,11 +2480,7 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
          <%vectorb%>
        }
        OMC_DISABLE_OPT
-       void initializeStaticLSData<%ls.index%>(DATA* data, threadData_t* threadData, LINEAR_SYSTEM_DATA* linearSystemData, modelica_boolean initSparsePattern)
-       {
-         int i=0;
-         <%body_initializeStaticLSData%>
-       }
+       <%initializeStaticLSVars(ls.vars, ls.index)%>
        >>
      end match
 
@@ -2531,13 +2509,6 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
               >>
             case SES_FOR_RESIDUAL(__) then "case 3"
            ;separator="\n")
-         let body_initializeStaticLSData = (ls.vars |> var hasindex i0 =>
-           <<
-           /* static ls data for <%crefStrNoUnderscore(varName(var))%> */
-           linearSystemData->nominal[i] = <%varAttributes(var, &sub)%>.nominal;
-           linearSystemData->min[i]     = <%varAttributes(var, &sub)%>.min;
-           linearSystemData->max[i++]   = <%varAttributes(var, &sub)%>.max;
-           >> ;separator="\n")
          // for casual tearing set
          let &varDeclsRes2 = buffer "" /*BUFD*/
          let &auxFunction2 = buffer ""
@@ -2558,14 +2529,6 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
              >>
             case SES_FOR_RESIDUAL(__) then "case 4"
            ;separator="\n")
-         let body_initializeStaticLSData2 = (at.vars |> var hasindex i0 =>
-           <<
-           /* static at data for <%crefStrNoUnderscore(varName(var))%> */
-           linearSystemData->nominal[i] = <%varAttributes(var, &sub)%>.nominal;
-           linearSystemData->min[i]     = <%varAttributes(var, &sub)%>.min;
-           linearSystemData->max[i++]   = <%varAttributes(var, &sub)%>.max;
-           >> ;separator="\n")
-
        <<
        <%auxFunction%>
        <%tmp%>
@@ -2590,11 +2553,7 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
          TRACE_POP
        }
        OMC_DISABLE_OPT
-       void initializeStaticLSData<%ls.index%>(DATA* data, threadData_t* threadData, LINEAR_SYSTEM_DATA* linearSystemData, modelica_boolean initSparsePattern)
-       {
-         int i=0;
-         <%body_initializeStaticLSData%>
-       }
+       <%initializeStaticLSVars(ls.vars, ls.index)%>
 
        <%auxFunction2%>
        <%tmp2%>
@@ -2619,11 +2578,7 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
          TRACE_POP
        }
        OMC_DISABLE_OPT
-       void initializeStaticLSData<%at.index%>(DATA* data, threadData_t* threadData, LINEAR_SYSTEM_DATA* linearSystemData, modelica_boolean initSparsePattern)
-       {
-         int i=0;
-         <%body_initializeStaticLSData2%>
-       }
+       <%initializeStaticLSVars(at.vars, at.index)%>
        >>
        else
          // for strict tearing set
@@ -2643,13 +2598,6 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
            let expPart = daeExp(exp, contextSimulationDiscrete, &preExp, &varDecls2, &auxFunction)
              '<%preExp%>linearSystemData->setBElement(<%i0%>, <%expPart%>, linearSystemData, threadData);'
           ;separator="\n")
-         let body_initializeStaticLSData = (ls.vars |> var hasindex i0 =>
-           <<
-           /* static ls data for <%crefStrNoUnderscore(varName(var))%> */
-           linearSystemData->nominal[i] = <%varAttributes(var, &sub)%>.nominal;
-           linearSystemData->min[i]     = <%varAttributes(var, &sub)%>.min;
-           linearSystemData->max[i++]   = <%varAttributes(var, &sub)%>.max;
-           >> ;separator="\n")
          // for casual tearing set
          let &varDecls3 = buffer "" /*BUFD*/
          let &auxFunction2 = buffer ""
@@ -2667,14 +2615,6 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
            let expPart4 = daeExp(exp, contextSimulationDiscrete, &preExp4, &varDecls4, &auxFunction2)
              '<%preExp4%>linearSystemData->setBElement(<%i0%>, <%expPart4%>, linearSystemData, threadData);'
            ;separator="\n")
-         let body_initializeStaticLSData2 = (at.vars |> var hasindex i0 =>
-           <<
-           /* static at data for <%crefStrNoUnderscore(varName(var))%> */
-           linearSystemData->nominal[i] = <%varAttributes(var, &sub)%>.nominal;
-           linearSystemData->min[i]     = <%varAttributes(var, &sub)%>.min;
-           linearSystemData->max[i++]   = <%varAttributes(var, &sub)%>.max;
-           >> ;separator="\n")
-
        <<
        <%auxFunction%>
        OMC_DISABLE_OPT
@@ -2694,11 +2634,7 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
          <%vectorb%>
        }
        OMC_DISABLE_OPT
-       void initializeStaticLSData<%ls.index%>(DATA* data, threadData_t* threadData, LINEAR_SYSTEM_DATA* linearSystemData, modelica_boolean initSparsePattern)
-       {
-         int i=0;
-         <%body_initializeStaticLSData%>
-       }
+       <%initializeStaticLSVars(ls.vars, ls.index)%>
 
        <%auxFunction2%>
        OMC_DISABLE_OPT
@@ -2718,11 +2654,7 @@ template functionSetupLinearSystemsTemp(list<SimEqSystem> linearSystems, String 
          <%vectorb2%>
        }
        OMC_DISABLE_OPT
-       void initializeStaticLSData<%at.index%>(DATA* data, threadData_t *threadData, LINEAR_SYSTEM_DATA* linearSystemData, modelica_boolean initSparsePattern)
-       {
-         int i=0;
-         <%body_initializeStaticLSData2%>
-       }
+       <%initializeStaticLSVars(at.vars, at.index)%>
        >>
      end match
    )
@@ -5222,7 +5154,10 @@ template functionlinearmodel(ModelInfo modelInfo, String modelNamePrefix) "templ
     <<
     const char *<%symbolName(modelNamePrefix,"linear_model_frame")%>()
     {
-      return "model linearized_model \"<%modelNamePrefix%>\" \n  parameter Integer n = <%varInfo.numStateVars%> \"number of states\";\n  parameter Integer m = <%varInfo.numInVars%> \"number of inputs\";\n  parameter Integer p = <%varInfo.numOutVars%> \"number of outputs\";\n"
+      return "model linearized_model \"<%modelNamePrefix%>\"\n"
+      "  parameter Integer n = <%varInfo.numStateVars%> \"number of states\";\n"
+      "  parameter Integer m = <%varInfo.numInVars%> \"number of inputs\";\n"
+      "  parameter Integer p = <%varInfo.numOutVars%> \"number of outputs\";\n"
       "  parameter Real x0[n] = %s;\n"
       "  parameter Real u0[m] = %s;\n"
       "\n"
@@ -5238,11 +5173,18 @@ template functionlinearmodel(ModelInfo modelInfo, String modelNamePrefix) "templ
       <%getVarName(vars.stateVars, "x")%>
       <%getVarName(vars.inputVars, "u")%>
       <%getVarName(vars.outputVars, "y")%>
-      "equation\n  der(x) = A * x + B * u;\n  y = C * x + D * u;\nend linearized_model;\n";
+      "equation\n"
+      "  der(x) = A * x + B * u;\n"
+      "  y = C * x + D * u;\n"
+      "end linearized_model;\n";
     }
     const char *<%symbolName(modelNamePrefix,"linear_model_datarecovery_frame")%>()
     {
-      return "model linearized_model \"<%modelNamePrefix%>\" \n parameter Integer n = <%varInfo.numStateVars%> \"number of states\";\n  parameter Integer m = <%varInfo.numInVars%> \"number of inputs\";\n  parameter Integer p = <%varInfo.numOutVars%> \"number of outputs\";\n  parameter Integer nz = <%varInfo.numAlgVars%> \"data recovery variables\";\n"
+      return "model linearized_model \"<%modelNamePrefix%>\"\n"
+      "  parameter Integer n = <%varInfo.numStateVars%> \"number of states\";\n"
+      "  parameter Integer m = <%varInfo.numInVars%> \"number of inputs\";\n"
+      "  parameter Integer p = <%varInfo.numOutVars%> \"number of outputs\";\n"
+      "  parameter Integer nz = <%varInfo.numAlgVars%> \"data recovery variables\";\n"
       "  parameter Real x0[<%varInfo.numStateVars%>] = %s;\n"
       "  parameter Real u0[<%varInfo.numInVars%>] = %s;\n"
       "  parameter Real z0[<%varInfo.numAlgVars%>] = %s;\n"
@@ -5263,7 +5205,11 @@ template functionlinearmodel(ModelInfo modelInfo, String modelNamePrefix) "templ
       <%getVarName(vars.inputVars, "u")%>
       <%getVarName(vars.outputVars, "y")%>
       <%getVarName(vars.algVars, "z")%>
-      "equation\n  der(x) = A * x + B * u;\n  y = C * x + D * u;\n  z = Cz * x + Dz * u;\nend linearized_model;\n";
+      "equation\n"
+      "  der(x) = A * x + B * u;\n"
+      "  y = C * x + D * u;\n"
+      "  z = Cz * x + Dz * u;\n"
+      "end linearized_model;\n";
     }
     >>
   end match
@@ -5284,8 +5230,11 @@ template functionlinearmodelMatlab(ModelInfo modelInfo, String modelNamePrefix) 
     {
       return "function [A, B, C, D, stateVars, inputVars, outputVars] = linearized_model()\n"
       "%% <%modelNamePrefix%>\n"
-      "%% der(x) = A * x + B * u\n%% y = C * x + D * u\n"
-      "  n = <%varInfo.numStateVars%>; %% number of states\n  m = <%varInfo.numInVars%>; %% number of inputs\n  p = <%varInfo.numOutVars%>; %% number of outputs\n"
+      "%% der(x) = A * x + B * u\n"
+      "%% y = C * x + D * u\n"
+      "  n = <%varInfo.numStateVars%>; %% number of states\n"
+      "  m = <%varInfo.numInVars%>; %% number of inputs\n"
+      "  p = <%varInfo.numOutVars%>; %% number of outputs\n"
       "\n"
       "  x0 = %s;\n"
       "  u0 = %s;\n"
@@ -5323,9 +5272,10 @@ template functionlinearmodelJulia(ModelInfo modelInfo, String modelNamePrefix) "
     const char *<%symbolName(modelNamePrefix,"linear_model_frame")%>()
     {
       return "function linearized_model()\n"
-      "#= <%modelNamePrefix%> =#\n"
-      "#= der(x) = A * x + B * u =#\n#= y = C * x + D * u =#\n"
-      "  local n = <%varInfo.numStateVars%> #= number of states =#\n  local m = <%varInfo.numInVars%> #= number of inputs =#\n  local p = <%varInfo.numOutVars%> #= number of outputs =#\n"
+      "  # <%modelNamePrefix%> #\n"
+      "  local n = <%varInfo.numStateVars%> # number of states \n"
+      "  local m = <%varInfo.numInVars%> # number of inputs \n"
+      "  local p = <%varInfo.numOutVars%> # number of outputs \n"
       "\n"
       "  local x0 = %s\n"
       "  local u0 = %s\n"
@@ -5334,11 +5284,12 @@ template functionlinearmodelJulia(ModelInfo modelInfo, String modelNamePrefix) "
       <%matrixB%>
       <%matrixC%>
       <%matrixD%>
-      <%getVarNameJulia(vars.stateVars, "x")%>
-      <%getVarNameJulia(vars.inputVars, "u")%>
-      <%getVarNameJulia(vars.outputVars, "y")%>
+      "  stateVars  = [<%getVarNameJulia(vars.stateVars, "x0")%>]\n"
+      "  inputVars  = [<%getVarNameJulia(vars.inputVars, "u0")%>]\n"
+      "  outputVars = [<%getVarNameJulia(vars.outputVars, "y0")%>]\n"
+      "  Ts = %g; #stop time\n\n"
       "\n"
-      "  (n, m, p, x0, u0, A, B, C, D)\n"
+      "  return (n, m, p, x0, u0, A, B, C, D, stateVars, inputVars, outputVars)\n"
       "end";
     }
     const char *<%symbolName(modelNamePrefix,"linear_model_datarecovery_frame")%>()
@@ -5365,8 +5316,11 @@ template functionlinearmodelPython(ModelInfo modelInfo, String modelNamePrefix) 
     {
       return "def linearized_model():\n"
       "    # <%modelNamePrefix%>\n"
-      "    # der(x) = A * x + B * u \n    # y = C * x + D * u \n"
-      "    n = <%varInfo.numStateVars%> # number of states\n    m = <%varInfo.numInVars%> # number of inputs\n    p = <%varInfo.numOutVars%> # number of outputs\n"
+      "    # der(x) = A * x + B * u \n"
+      "    # y = C * x + D * u \n"
+      "    n = <%varInfo.numStateVars%> # number of states\n"
+      "    m = <%varInfo.numInVars%> # number of inputs\n"
+      "    p = <%varInfo.numOutVars%> # number of outputs\n"
       "\n"
       "    x0 = %s\n"
       "    u0 = %s\n"
@@ -5391,45 +5345,37 @@ end functionlinearmodelPython;
 template getVarName(list<SimVar> simVars, String arrayName) "template getVarName
   Generates name for a varables."
 ::=
-  simVars |> var hasindex arrindex fromindex 1 =>
-    (match var
+  simVars |> var hasindex arrindex fromindex 1 => (match var
     case SIMVAR(__) then
       <<"  Real '<%arrayName%>_<%crefStrNoUnderscore(name)%>' = <%arrayName%>[<%arrindex%>];\n">>
-    end match)
-  ; empty
+    end match) ;separator="\n"
 end getVarName;
 
 template getVarNameMatlab(list<SimVar> simVars, String arrayName) "template getVarName
   Generates name for a varables."
 ::=
-<<
-<%simVars |> var hasindex arrindex fromindex 1 => (match var
+  simVars |> var hasindex arrindex fromindex 1 => (match var
     case SIMVAR(__) then
       <<'<%crefStrMatlabSafe(name)%>'>>
-    end match) ;separator=","%>
->>
+    end match) ;separator=","
 end getVarNameMatlab;
 
 template getVarNamePython(list<SimVar> simVars, String arrayName) "template getVarName
   Generates name for a variables."
 ::=
-<<
-<%simVars |> var hasindex arrindex fromindex 0 => (match var
+  simVars |> var hasindex arrindex fromindex 0 => (match var
     case SIMVAR(__) then
       <<'<%crefStrMatlabSafe(name)%>'>>
-    end match) ;separator=","%>
->>
+    end match) ;separator=","
 end getVarNamePython;
 
 template getVarNameJulia(list<SimVar> simVars, String arrayName) "template getVarName
   Generates name for a varables."
 ::=
-  simVars |> var hasindex arrindex fromindex 1 =>
-    (match var
+  simVars |> var hasindex arrindex fromindex 0 => (match var
     case SIMVAR(__) then
-      <<"  # <%arrayName%>_<%crefStrMatlabSafe(name)%> = <%arrayName%>(<%arrindex%>);\n">>
-    end match)
-  ; empty
+      <<\"<%crefStrMatlabSafe(name)%>\">>
+    end match) ;separator=","
 end getVarNameJulia;
 
 template genMatrix(String name, String row, String col, Integer rowI, Integer colI) "template genMatrix
@@ -5491,7 +5437,7 @@ template genMatrixJulia(String name, String row, String col, Integer rowI, Integ
     case 0 then
       <<"  local <%name%> = zeros(<%row%>, <%col%>)%s\n">>
     case _ then
-      <<"  local <%name%> =\t[%s]\n\n">>
+      <<"  local <%name%> = [%s]\n\n">>
     end match
   end match
 end genMatrixJulia;

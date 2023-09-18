@@ -17,6 +17,7 @@ ArrayBounds3.mo \
 ArrayBoundsAlg1.mo \
 ArrayBoundsBinding1.mo \
 ArrayBoundsEq1.mo\
+ArrayBoundsEq2.mo\
 ArrayConnect1.mo \
 ArrayConnect2.mo \
 ArrayConnect3.mo \
@@ -282,6 +283,7 @@ ConnectAlgorithm.mo \
 ConnectArrays1.mo \
 ConnectArrays2.mo \
 ConnectArrays3.mo \
+ConnectArrays4.mo \
 ConnectArraysInvalidSubscript1.mo \
 ConnectComplex1.mo \
 ConnectComplexFlow1.mo \
@@ -407,6 +409,7 @@ EnumConversion1.mo \
 EnumConversion2.mo \
 EnumInvalidLiteralName1.mo \
 EnumRangeBinding1.mo \
+EnumUnspecified1.mo \
 eq1.mo \
 eq2.mo \
 eq3.mo \
@@ -489,8 +492,11 @@ ExternalObject5.mo \
 ExternalObjectInvalidElement1.mo \
 ExternalObjectInvalidStructor1.mo \
 ExternalObjectMissingStructor1.mo \
+ExternalObjectMod1.mo \
+ExternalObjectReplaceable1.mo \
 ExternalObjectStructorCall1.mo \
 ExternalObjectStructorCall2.mo \
+ExternalObjectVariability1.mo \
 Final1.mo \
 Final2.mo \
 Final3.mo \
@@ -713,7 +719,6 @@ IfExpression8.mo \
 IfExpression10.mo \
 IfExpression11.mo \
 IfExpression12.mo \
-IfExpression13.mo \
 IfExpression14.mo \
 IfEquationInvalidCond1.mo \
 ih1.mo \
@@ -768,6 +773,7 @@ InnerOuter10.mo \
 InnerOuter11.mo \
 InnerOuter12.mo \
 InnerOuterClass1.mo \
+InnerOuterConnect1.mo \
 InnerOuterDuplicate1.mo \
 InnerOuterInvalidMod1.mo \
 InnerOuterInvalidMod2.mo \
@@ -789,6 +795,8 @@ InnerOuterNotInner1.mo \
 InnerOuterPartialOuter1.mo \
 InnerOuterPartialOuter2.mo \
 InnerOuterReplaceable1.mo \
+InnerOuterReplaceable2.mo \
+InnerOuterReplaceable3.mo \
 InstanceRestriction1.mo \
 InstanceRestriction2.mo \
 InStreamArray.mo \
@@ -961,6 +969,7 @@ RecordBinding12.mo \
 RecordBinding13.mo \
 RecordConstructor1.mo \
 RecordConstructor2.mo \
+RecordConstructor3.mo \
 RecordExtends1.mo \
 RecordExtends2.mo \
 RecordUnknownDim1.mo \
@@ -996,6 +1005,8 @@ RedeclareEnum1.mo \
 RedeclareEnum2.mo \
 RedeclareEnum3.mo \
 RedeclareEnum4.mo \
+RedeclareEnum5.mo \
+RedeclareEnum6.mo \
 RedeclareFunction1.mo \
 RedeclareInvalidConnectorType1.mo \
 RedeclareInvalidVariability1.mo \
@@ -1165,6 +1176,7 @@ sts.mos \
 # test that currently fail. Move up when fixed.
 # Run make testfailing
 FAILINGTESTFILES=\
+IfExpression13.mo \
 ProtectedMod4.mo \
 CevalFuncRecord3.mo \
 CevalFuncRecord4.mo \

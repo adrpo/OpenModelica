@@ -325,9 +325,38 @@ function lookupRootClass
   input InstNode topScope;
   input InstContext.Type context;
   output InstNode clsNode;
+protected
+  InstContext.Type next_context;
+  String last;
+  ComplexType cty;
 algorithm
-  clsNode := Lookup.lookupClassName(path, topScope, InstContext.set(context, NFInstContext.RELAXED),
-    AbsynUtil.dummyInfo, checkAccessViolations = false);
+  next_context := InstContext.set(context, NFInstContext.RELAXED);
+
+  ErrorExt.setCheckpoint(getInstanceName());
+  try
+    clsNode := Lookup.lookupClassName(path, topScope, next_context, AbsynUtil.dummyInfo, checkAccessViolations = false);
+    ErrorExt.delCheckpoint(getInstanceName());
+  else
+    // Allow lookup of structor functions in ExternalObject:s (to allow e.g.
+    // checkModel on them). These are stored in the ComplexType of the node
+    // instead of in the class tree like normal elements.
+    try
+      last := AbsynUtil.pathLastIdent(path);
+      true := last == "constructor" or last == "destructor";
+      clsNode := Lookup.lookupName(AbsynUtil.stripLast(path), topScope, next_context, checkAccessViolations = false);
+      Type.COMPLEX(complexTy = cty) := InstNode.getType(clsNode);
+
+      if last == "constructor" then
+        ComplexType.EXTERNAL_OBJECT(constructor = clsNode) := cty;
+      else
+        ComplexType.EXTERNAL_OBJECT(destructor = clsNode) := cty;
+      end if;
+      ErrorExt.rollBack(getInstanceName());
+    else
+      ErrorExt.delCheckpoint(getInstanceName());
+    end try;
+  end try;
+
   clsNode := InstUtil.mergeScalars(clsNode, path);
   checkInstanceRestriction(clsNode, path, context);
   clsNode := InstNode.setNodeType(InstNodeType.ROOT_CLASS(InstNode.EMPTY_NODE()), clsNode);
@@ -846,18 +875,20 @@ algorithm
           end for;
         end if;
 
-        // An external object must have exactly two functions called constructor and
-        // destructor.
+        // An external object must have exactly two non-replaceable functions
+        // called constructor and destructor.
         for cls in tree.classes loop
           () := match InstNode.name(cls)
             case "constructor" guard SCodeUtil.isFunction(InstNode.definition(cls))
               algorithm
+                checkElementNotReplaceable(cls);
                 constructor := cls;
               then
                 ();
 
             case "destructor" guard SCodeUtil.isFunction(InstNode.definition(cls))
               algorithm
+                checkElementNotReplaceable(cls);
                 destructor := cls;
               then
                 ();
@@ -891,6 +922,16 @@ algorithm
 
   end match;
 end makeExternalObjectType;
+
+function checkElementNotReplaceable
+  input InstNode node;
+algorithm
+  if SCodeUtil.isElementReplaceable(InstNode.definition(node)) then
+    Error.addSourceMessage(Error.ELEMENT_REPLACEABLE_NOT_ALLOWED,
+      {InstNode.name(node)}, InstNode.info(node));
+    fail();
+  end if;
+end checkElementNotReplaceable;
 
 function expandClassDerived
   input SCode.Element element;
@@ -1110,6 +1151,10 @@ algorithm
     case Class.PARTIAL_BUILTIN(restriction = Restriction.EXTERNAL_OBJECT())
       algorithm
         inst_cls := Class.INSTANCED_BUILTIN(cls.ty, cls.elements, cls.restriction);
+
+        // External objects have nothing to modify, but call applyModifier
+        // so we get an error message if there is a modifier anyway.
+        applyModifier(outerMod, cls.elements, node, context);
         node := InstNode.replaceClass(inst_cls, node);
         updateComponentType(parent, node);
         instExternalObjectStructors(cls.ty, parent, context);
@@ -1664,10 +1709,24 @@ function redeclareEnum
   input InstNode originalNode;
   output Class redeclaredClass = redeclareClass;
 algorithm
+  // Expand the redeclare node so we can check whether it's an enumeration or not.
+  expand(redeclareNode);
+  redeclaredClass := InstNode.getClass(redeclareNode);
+
   redeclaredClass := match (redeclaredClass, originalClass)
     local
       list<String> lits1, lits2;
 
+    // Redeclare enumeration(:).
+    case (_, Class.PARTIAL_BUILTIN(ty = Type.ENUMERATION(literals = {})))
+      guard InstNode.isEnumerationType(redeclareNode)
+      algorithm
+        redeclaredClass := Class.setPrefixes(prefixes, redeclaredClass);
+        redeclaredClass := Class.mergeModifier(outerMod, redeclaredClass);
+      then
+        redeclaredClass;
+
+    // Redeclare normal enumeration.
     case (Class.PARTIAL_BUILTIN(ty = Type.ENUMERATION(literals = lits1)),
           Class.PARTIAL_BUILTIN(ty = Type.ENUMERATION(literals = lits2)))
       algorithm
@@ -1986,7 +2045,7 @@ protected
   Attributes attr;
   Type orig_ty, rdcl_ty;
   Option<SCode.Comment> cmt;
-  InstNode rdcl_node;
+  InstNode orig_node, rdcl_node;
   InstNodeType rdcl_type;
 algorithm
   // Check that the redeclare element actually is a component.
@@ -1997,10 +2056,11 @@ algorithm
     fail();
   end if;
 
-  orig_comp := InstNode.component(originalNode);
-  rdcl_type := InstNodeType.REDECLARED_COMP(InstNode.parent(originalNode));
+  orig_node := InstNode.resolveInner(originalNode);
+  orig_comp := InstNode.component(orig_node);
+  rdcl_type := InstNodeType.REDECLARED_COMP(InstNode.parent(orig_node));
   rdcl_node := InstNode.setNodeType(rdcl_type, redeclareNode);
-  rdcl_node := InstNode.copyInstancePtr(originalNode, rdcl_node);
+  rdcl_node := InstNode.copyInstancePtr(orig_node, rdcl_node);
   rdcl_node := InstNode.updateComponent(InstNode.component(redeclareNode), rdcl_node);
   instComponent(rdcl_node, outerAttr, constrainingMod, true, instLevel, context,
     SOME(Component.getAttributes(orig_comp)), propagatedSubs);
@@ -2045,7 +2105,7 @@ algorithm
 
   end match;
 
-  InstNode.updateComponent(new_comp, redeclaredNode);
+  InstNode.updateComponent(new_comp, InstNode.resolveInner(redeclaredNode));
 end redeclareComponent;
 
 function checkOuterComponentMod
@@ -2140,6 +2200,9 @@ algorithm
         Error.addSourceMessage(Error.RECURSIVE_DEFINITION,
           {InstNode.name(component), InstNode.name(InstNode.classScope(InstNode.parent(component)))},
           InstNode.info(component));
+        // Remove the class node from the component to avoid infinite loops when
+        // using the instance API.
+        InstNode.componentApply(component, Component.setClassInstance, InstNode.EMPTY_NODE());
         fail();
       end if;
 
@@ -2151,6 +2214,7 @@ algorithm
     // If we couldn't determine the exact cause of the recursion, print a generic error.
     Error.addSourceMessage(Error.INST_RECURSION_LIMIT_REACHED,
       {AbsynUtil.pathString(InstNode.scopePath(component))}, InstNode.info(component));
+    InstNode.componentApply(component, Component.setClassInstance, InstNode.EMPTY_NODE());
     fail();
   end if;
 end checkRecursiveDefinition;
@@ -2167,14 +2231,19 @@ algorithm
 
     case Dimension.RAW_DIM(dim = dim)
       then
-        match dim
+        matchcontinue dim
           case Absyn.NOSUB() then Dimension.UNKNOWN();
           case Absyn.SUBSCRIPT()
             algorithm
               exp := instExp(dim.subscript, dimension.scope, context, info);
             then
               Dimension.UNTYPED(exp, false);
-        end match;
+
+          case _
+            guard InstContext.inRelaxed(context)
+            then Dimension.UNKNOWN();
+
+        end matchcontinue;
 
     else dimension;
   end match;
@@ -2711,15 +2780,7 @@ algorithm
       then
         fail();
 
-    else
-      algorithm
-        prefixed_cref := ComponentRef.fromNodeList(InstNode.scopeList(scope));
-        prefixed_cref := if ComponentRef.isEmpty(prefixed_cref) then
-          cref else ComponentRef.append(cref, prefixed_cref);
-        prefixed_cref := ComponentRef.removeOuterCrefPrefix(prefixed_cref);
-      then
-        Expression.CREF(Type.UNKNOWN(), prefixed_cref);
-
+    else Expression.CREF(Type.UNKNOWN(), ComponentRef.appendScope(scope, cref));
   end match;
 end instCrefComponent;
 
@@ -2732,8 +2793,7 @@ function instCrefFunction
 protected
   ComponentRef fn_ref;
 algorithm
-  fn_ref := ComponentRef.fromNodeList(InstNode.scopeList(scope, includeRoot = true));
-  fn_ref := ComponentRef.append(cref, fn_ref);
+  fn_ref := ComponentRef.appendScope(scope, cref, includeRoot = true);
   fn_ref := Function.instFunctionRef(fn_ref, context, info);
   crefExp := Expression.CREF(Type.UNKNOWN(), fn_ref);
 end instCrefFunction;
@@ -2985,9 +3045,18 @@ protected
 algorithm
   if InstContext.inInstanceAPI(context) then
     scode_eql := filterInstanceAPIEquations(scodeEql);
-  end if;
 
-  instEql := list(instEquation(eq, scope, context) for eq in scode_eql);
+    instEql := {};
+    for eq in scode_eql loop
+      try
+        instEql := instEquation(eq, scope, context) :: instEql;
+      else
+      end try;
+    end for;
+    instEql := listReverseInPlace(instEql);
+  else
+    instEql := list(instEquation(eq, scope, context) for eq in scode_eql);
+  end if;
 end instEquations;
 
 function filterInstanceAPIEquations
@@ -3157,12 +3226,7 @@ protected
 algorithm
   (cref, found_scope) := Lookup.lookupConnector(absynCref, scope, context, info);
   cref := instCrefSubscripts(cref, scope, context, info);
-
-  prefix := ComponentRef.fromNodeList(InstNode.scopeList(found_scope));
-  if not ComponentRef.isEmpty(prefix) then
-    cref := ComponentRef.append(cref, prefix);
-  end if;
-
+  cref := ComponentRef.appendScope(found_scope, cref);
   outExp := Expression.CREF(Type.UNKNOWN(), cref);
 end instConnectorCref;
 
@@ -3180,7 +3244,11 @@ function instAlgorithmSections
   input InstContext.Type context;
   output list<Algorithm> algs;
 algorithm
-  algs := list(instAlgorithmSection(alg, scope, context) for alg in algorithmSections);
+  if InstContext.inInstanceAPI(context) then
+    algs := {};
+  else
+    algs := list(instAlgorithmSection(alg, scope, context) for alg in algorithmSections);
+  end if;
 end instAlgorithmSections;
 
 function instAlgorithmSection
@@ -3532,7 +3600,7 @@ algorithm
     node := Lookup.lookupSimpleName(name, scope, context);
 
     if InstNode.isInner(node) then
-      is_error := not InstContext.inRelaxed(context);
+      is_error := not (InstContext.inRelaxed(context) or Flags.isConfigFlagSet(Flags.ALLOW_NON_STANDARD_MODELICA, "nonStdTopLevelOuter"));
 
       if is_error then
         Error.addSourceMessageAsError(Error.TOP_LEVEL_OUTER, {name}, InstNode.info(node));

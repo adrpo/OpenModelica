@@ -34,7 +34,7 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 }
 
 # Set the C++ standard.
-CONFIG += c++14
+CONFIG += c++1z
 
 TARGET = OMEdit
 TEMPLATE = app
@@ -76,7 +76,6 @@ SOURCES += main.cpp
 
 # Please read the warnings. They are like vegetables; good for you even if you hate them.
 CONFIG += warn_on
-# Only disable the unused variable/function/parameter warning
 win32 {
   # -Wno-clobbered is not recognized by clang
   !contains(_cxx, clang++) {

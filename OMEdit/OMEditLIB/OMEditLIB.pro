@@ -34,7 +34,7 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 }
 
 # Set the C++ standard.
-CONFIG += c++14
+CONFIG += c++1z
 
 TARGET = OMEdit
 TEMPLATE = lib
@@ -98,6 +98,7 @@ INCLUDEPATH += . ../ \
   $$OPENMODELICAHOME/include/omc/c \
   $$OPENMODELICAHOME/include/omc/c/util \
   $$OPENMODELICAHOME/include/omc/fmil \
+  $$OPENMODELICAHOME/../OMSimulator/include/ \
   $$OPENMODELICAHOME/../OMParser/ \
   $$OPENMODELICAHOME/../OMParser/3rdParty/antlr4/runtime/Cpp/runtime/src
 
@@ -393,7 +394,6 @@ OTHER_FILES += Resources/css/stylesheet.qss \
 
 # Please read the warnings. They are like vegetables; good for you even if you hate them.
 CONFIG += warn_on
-# Only disable the unused variable/function/parameter warning
 win32 {
   # -Wno-clobbered is not recognized by clang
   !contains(_cxx, clang++) {

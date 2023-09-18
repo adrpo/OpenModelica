@@ -241,9 +241,11 @@ GraphicsView::~GraphicsView()
    * We need to delete the items that are not part of the scene.
    */
   foreach (Element *pElement, mOutOfSceneElementsList) {
-    if (pElement->getOriginItem()) {
-      delete pElement->getOriginItem();
-    }
+    delete pElement->getOriginItem();
+    delete pElement->getBottomLeftResizerItem();
+    delete pElement->getTopLeftResizerItem();
+    delete pElement->getTopRightResizerItem();
+    delete pElement->getBottomRightResizerItem();
     delete pElement;
   }
 
@@ -436,8 +438,7 @@ void GraphicsView::drawElements(ModelInstance::Model *pModelInstance, bool inher
             if (pDiagramElement) {
               pDiagramElement->setModelComponent(pModelInstanceComponent);
               pDiagramElement->reDrawElementNew();
-              pDiagramGraphicsView->addItem(pDiagramElement);
-              pDiagramGraphicsView->addItem(pDiagramElement->getOriginItem());
+              pDiagramGraphicsView->addElementItem(pDiagramElement);
               pDiagramGraphicsView->addElementToList(pDiagramElement);
               pDiagramGraphicsView->deleteElementFromOutOfSceneList(pDiagramElement);
               if (pModelInstanceComponent->getModel()->isConnector() && connectorIndex < modelInfo.mIconElementsList.size()) {
@@ -445,8 +446,7 @@ void GraphicsView::drawElements(ModelInstance::Model *pModelInstance, bool inher
                 if (pIconElement) {
                   pIconElement->setModelComponent(pModelInstanceComponent);
                   pIconElement->reDrawElementNew();
-                  pIconGraphicsView->addItem(pIconElement);
-                  pIconGraphicsView->addItem(pIconElement->getOriginItem());
+                  pIconGraphicsView->addElementItem(pIconElement);
                   pIconGraphicsView->addElementToList(pIconElement);
                   pIconGraphicsView->deleteElementFromOutOfSceneList(pIconElement);
                   pIconElement->setVisible(pModelInstanceComponent->isPublic());
@@ -1074,8 +1074,7 @@ void GraphicsView::addElementToView(ModelInstance::Component *pComponent, bool i
   if (pIconElement && pComponent->getModel()->isConnector()) {
     // Connector type elements exists on icon view as well
     if (pIconElement->mTransformation.isValid() && pIconElement->mTransformation.getVisible()) {
-      pIconGraphicsView->addItem(pIconElement);
-      pIconGraphicsView->addItem(pIconElement->getOriginItem());
+      pIconGraphicsView->addElementItem(pIconElement);
     }
     if (pIconElement->isInheritedElement()) {
       pIconGraphicsView->addInheritedElementToList(pIconElement);
@@ -1087,8 +1086,7 @@ void GraphicsView::addElementToView(ModelInstance::Component *pComponent, bool i
   }
 
   if (pDiagramElement->mTransformation.isValid() && pDiagramElement->mTransformation.getVisible()) {
-    pDiagramGraphicsView->addItem(pDiagramElement);
-    pDiagramGraphicsView->addItem(pDiagramElement->getOriginItem());
+    pDiagramGraphicsView->addElementItem(pDiagramElement);
   }
   if (pDiagramElement->isInheritedElement()) {
     pDiagramGraphicsView->addInheritedElementToList(pDiagramElement);
@@ -1163,6 +1161,36 @@ void GraphicsView::addElementToClass(Element *pElement)
   }
 }
 
+/*!
+ * \brief GraphicsView::addElementItem
+ * Adds the Element and its origin and resizer items to the GraphicsView.
+ * \param pElement
+ */
+void GraphicsView::addElementItem(Element *pElement)
+{
+  addItem(pElement);
+  addItem(pElement->getOriginItem());
+  addItem(pElement->getBottomLeftResizerItem());
+  addItem(pElement->getTopLeftResizerItem());
+  addItem(pElement->getTopRightResizerItem());
+  addItem(pElement->getBottomRightResizerItem());
+}
+
+/*!
+ * \brief GraphicsView::removeElementItem
+ * Removes the Element and its origin and resizer items from the GraphicsView.
+ * \param pElement
+ */
+void GraphicsView::removeElementItem(Element *pElement)
+{
+  removeItem(pElement);
+  removeItem(pElement->getOriginItem());
+  removeItem(pElement->getBottomLeftResizerItem());
+  removeItem(pElement->getTopLeftResizerItem());
+  removeItem(pElement->getTopRightResizerItem());
+  removeItem(pElement->getBottomRightResizerItem());
+}
+
 QString getComponentName(const QString &qualifiedComponentName)
 {
   QString componentName = StringHandler::getFirstWordBeforeDot(qualifiedComponentName);
@@ -1228,14 +1256,12 @@ void GraphicsView::deleteElement(Element *pElement)
       }
       Element *pConnectorElement = pGraphicsView->getElementObject(pElement->getName());
       if (pConnectorElement) {
-        pGraphicsView->removeItem(pConnectorElement);
-        pGraphicsView->removeItem(pConnectorElement->getOriginItem());
+        pGraphicsView->removeElementItem(pConnectorElement);
         pGraphicsView->deleteElementFromList(pConnectorElement);
         pGraphicsView->addElementToOutOfSceneList(pConnectorElement);
       }
     }
-    removeItem(pElement);
-    removeItem(pElement->getOriginItem());
+    removeElementItem(pElement);
     deleteElementFromList(pElement);
     addElementToOutOfSceneList(pElement);
     deleteElementFromClass(pElement);
@@ -1423,16 +1449,16 @@ void GraphicsView::addConnectionDetails(LineAnnotation *pConnectionLineAnnotatio
   if (pStartElement) {
     if (pStartElement->getRootParentElement()) {
       pStartElement->getRootParentElement()->addConnectionDetails(pConnectionLineAnnotation);
-      if (pConnectionLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+      if (pConnectionLineAnnotation->isTransition()) {
         pStartElement->getRootParentElement()->setHasTransition(true);
-      } else if (pConnectionLineAnnotation->getLineType() == LineAnnotation::InitialStateType) {
+      } else if (pConnectionLineAnnotation->isInitialState()) {
         pStartElement->getRootParentElement()->setIsInitialState(true);
       }
     } else {
       pStartElement->addConnectionDetails(pConnectionLineAnnotation);
-      if (pConnectionLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+      if (pConnectionLineAnnotation->isTransition()) {
         pStartElement->setHasTransition(true);
-      } else if (pConnectionLineAnnotation->getLineType() == LineAnnotation::InitialStateType) {
+      } else if (pConnectionLineAnnotation->isInitialState()) {
         pStartElement->setIsInitialState(false);
       }
     }
@@ -1442,12 +1468,12 @@ void GraphicsView::addConnectionDetails(LineAnnotation *pConnectionLineAnnotatio
   if (pEndElement) {
     if (pEndElement->getRootParentElement()) {
       pEndElement->getRootParentElement()->addConnectionDetails(pConnectionLineAnnotation);
-      if (pConnectionLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+      if (pConnectionLineAnnotation->isTransition()) {
         pEndElement->getRootParentElement()->setHasTransition(true);
       }
     } else {
       pEndElement->addConnectionDetails(pConnectionLineAnnotation);
-      if (pConnectionLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+      if (pConnectionLineAnnotation->isTransition()) {
         pEndElement->setHasTransition(true);
       }
     }
@@ -1685,16 +1711,16 @@ void GraphicsView::removeConnectionDetails(LineAnnotation *pConnectionLineAnnota
   if (pStartElement) {
     if (pStartElement->getRootParentElement()) {
       pStartElement->getRootParentElement()->removeConnectionDetails(pConnectionLineAnnotation);
-      if (pConnectionLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+      if (pConnectionLineAnnotation->isTransition()) {
         pStartElement->getRootParentElement()->setHasTransition(false);
-      } else if (pConnectionLineAnnotation->getLineType() == LineAnnotation::InitialStateType) {
+      } else if (pConnectionLineAnnotation->isInitialState()) {
         pStartElement->getRootParentElement()->setIsInitialState(false);
       }
     } else {
       pStartElement->removeConnectionDetails(pConnectionLineAnnotation);
-      if (pConnectionLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+      if (pConnectionLineAnnotation->isTransition()) {
         pStartElement->setHasTransition(false);
-      } else if (pConnectionLineAnnotation->getLineType() == LineAnnotation::InitialStateType) {
+      } else if (pConnectionLineAnnotation->isInitialState()) {
         pStartElement->setIsInitialState(false);
       }
     }
@@ -1704,12 +1730,12 @@ void GraphicsView::removeConnectionDetails(LineAnnotation *pConnectionLineAnnota
   if (pEndElement) {
     if (pEndElement->getRootParentElement()) {
       pEndElement->getRootParentElement()->removeConnectionDetails(pConnectionLineAnnotation);
-      if (pConnectionLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+      if (pConnectionLineAnnotation->isTransition()) {
         pEndElement->getRootParentElement()->setHasTransition(false);
       }
     } else {
       pEndElement->removeConnectionDetails(pConnectionLineAnnotation);
-      if (pConnectionLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+      if (pConnectionLineAnnotation->isTransition()) {
         pEndElement->setHasTransition(false);
       }
     }
@@ -2119,9 +2145,12 @@ void GraphicsView::removeClassComponents()
   foreach (Element *pElement, mElementsList) {
     pElement->removeChildren();
     deleteElementFromList(pElement);
-    removeItem(pElement->getOriginItem());
+    removeElementItem(pElement);
     delete pElement->getOriginItem();
-    removeItem(pElement);
+    delete pElement->getBottomLeftResizerItem();
+    delete pElement->getTopLeftResizerItem();
+    delete pElement->getTopRightResizerItem();
+    delete pElement->getBottomRightResizerItem();
     pElement->emitDeleted();
     delete pElement;
   }
@@ -2134,8 +2163,7 @@ void GraphicsView::removeClassComponents()
 void GraphicsView::removeElementsFromScene()
 {
   foreach (Element *pElement, mElementsList) {
-    removeItem(pElement->getOriginItem());
-    removeItem(pElement);
+    removeElementItem(pElement);
     addElementToOutOfSceneList(pElement);
     deleteElementFromList(pElement);
   }
@@ -2151,6 +2179,10 @@ void GraphicsView::removeOutOfSceneClassComponents()
     pComponent->removeChildren();
     deleteElementFromOutOfSceneList(pComponent);
     delete pComponent->getOriginItem();
+    delete pComponent->getBottomLeftResizerItem();
+    delete pComponent->getTopLeftResizerItem();
+    delete pComponent->getTopRightResizerItem();
+    delete pComponent->getBottomRightResizerItem();
     pComponent->emitDeleted();
     delete pComponent;
   }
@@ -2179,9 +2211,12 @@ void GraphicsView::removeInheritedClassElements()
   foreach (Element *pElement, mInheritedElementsList) {
     pElement->removeChildren();
     deleteInheritedElementFromList(pElement);
-    removeItem(pElement->getOriginItem());
+    removeElementItem(pElement);
     delete pElement->getOriginItem();
-    removeItem(pElement);
+    delete pElement->getBottomLeftResizerItem();
+    delete pElement->getTopLeftResizerItem();
+    delete pElement->getTopRightResizerItem();
+    delete pElement->getBottomRightResizerItem();
     pElement->emitDeleted();
     delete pElement;
   }
@@ -2887,7 +2922,7 @@ bool GraphicsView::isAnyItemSelectedAndEditable(int key)
     if (pShapeAnnotation && !pShapeAnnotation->isInheritedShape()) {
       LineAnnotation *pLineAnnotation = dynamic_cast<LineAnnotation*>(pShapeAnnotation);
       // if the shape is connection line then we only return true for certain cases.
-      if (pLineAnnotation && pLineAnnotation->getLineType() == LineAnnotation::ConnectionType) {
+      if (pLineAnnotation && pLineAnnotation->isConnection()) {
         switch (key) {
           case Qt::Key_Delete:
             selectedAndEditable = true;
@@ -3547,7 +3582,7 @@ void GraphicsView::copyItems(bool cut)
         components << QString("%1 %2%3 %4;").arg(pComponent->getClassName(), pComponent->getName(), "", pComponent->getPlacementAnnotation(true));
       } else if (ShapeAnnotation *pShapeAnnotation = dynamic_cast<ShapeAnnotation*>(selectedItems.at(i))) {
         LineAnnotation *pLineAnnotation = dynamic_cast<LineAnnotation*>(selectedItems.at(i));
-        if (pLineAnnotation && pLineAnnotation->getLineType() == LineAnnotation::ConnectionType) {
+        if (pLineAnnotation && pLineAnnotation->isConnection()) {
           // Only consider the connection for copying if both the start and the end components are selected.
           if (pLineAnnotation->getStartElement()->getRootParentElement()->isSelected() && pLineAnnotation->getEndElement()->getRootParentElement()->isSelected()) {
             pMimeData->addConnection(pLineAnnotation);
@@ -3607,12 +3642,12 @@ void GraphicsView::modelicaOneShapeContextMenu(ShapeAnnotation *pShapeAnnotation
   pMenu->addSeparator();
   pMenu->addAction(mpCutAction);
   pMenu->addAction(mpCopyAction);
-  if (pLineAnnotation && pLineAnnotation->getLineType() == LineAnnotation::ConnectionType) {
+  if (pLineAnnotation && pLineAnnotation->isConnection()) {
     // nothing special for connection
-  } else if (pLineAnnotation && pLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+  } else if (pLineAnnotation && pLineAnnotation->isTransition()) {
     pMenu->addSeparator();
     pMenu->addAction(pShapeAnnotation->getEditTransitionAction());
-  } else if (pLineAnnotation && pLineAnnotation->getLineType() == LineAnnotation::ShapeType) {
+  } else if (pLineAnnotation && pLineAnnotation->isLineShape()) {
     pMenu->addAction(mpDuplicateAction);
     pMenu->addSeparator();
     pMenu->addAction(mpManhattanizeAction);
@@ -4704,7 +4739,7 @@ void GraphicsView::mouseDoubleClickEvent(QMouseEvent *event)
   if (!isCreatingConnection() && !isCreatingTransition() && pShapeAnnotation && pShapeAnnotation->getGraphicsView()) {
     if (mpModelWidget->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::Modelica) {
       LineAnnotation *pTransitionLineAnnotation = dynamic_cast<LineAnnotation*>(pShapeAnnotation);
-      if (pTransitionLineAnnotation && pTransitionLineAnnotation->getLineType() == LineAnnotation::TransitionType) {
+      if (pTransitionLineAnnotation && pTransitionLineAnnotation->isTransition()) {
         pShapeAnnotation->editTransition();
       } else {
         pShapeAnnotation->showShapeProperties();
@@ -4713,7 +4748,7 @@ void GraphicsView::mouseDoubleClickEvent(QMouseEvent *event)
     }
     if (mpModelWidget->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::OMS) {
       LineAnnotation *pConnectionLineAnnotation = dynamic_cast<LineAnnotation*>(pShapeAnnotation);
-      if (pConnectionLineAnnotation && pConnectionLineAnnotation->getLineType() == LineAnnotation::ConnectionType) {
+      if (pConnectionLineAnnotation && pConnectionLineAnnotation->isConnection()) {
         pConnectionLineAnnotation->showOMSConnection();
       }
     } else if (mpModelWidget->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::CompositeModel) {
@@ -8699,14 +8734,12 @@ void ModelWidget::drawOMSElement(LibraryTreeItem *pLibraryTreeItem, const QStrin
       || (pLibraryTreeItem->getOMSBusConnector())
       || (pLibraryTreeItem->getOMSTLMBusConnector())) {
     Element *pIconComponent = new Element(pLibraryTreeItem->getName(), pLibraryTreeItem, annotation, QPointF(0, 0), pComponentInfo, mpIconGraphicsView);
-    mpIconGraphicsView->addItem(pIconComponent);
-    mpIconGraphicsView->addItem(pIconComponent->getOriginItem());
+    mpIconGraphicsView->addElementItem(pIconComponent);
     mpIconGraphicsView->addElementToList(pIconComponent);
   }
   // add the element to diagram view
   Element *pDiagramComponent = new Element(pLibraryTreeItem->getName(), pLibraryTreeItem, annotation, QPointF(0, 0), pComponentInfo, mpDiagramGraphicsView);
-  mpDiagramGraphicsView->addItem(pDiagramComponent);
-  mpDiagramGraphicsView->addItem(pDiagramComponent->getOriginItem());
+  mpDiagramGraphicsView->addElementItem(pDiagramComponent);
   mpDiagramGraphicsView->addElementToList(pDiagramComponent);
 }
 
@@ -9853,36 +9886,6 @@ void ModelWidgetContainer::currentModelWidgetChanged(QMdiSubWindow *pSubWindow)
     }
     // update the Undo/Redo actions
     pModelWidget->updateUndoRedoActions();
-    /* ticket:5441 OMEdit toolbars
-     * Show the relevant toolbars if we are in a Modeling perspective
-     */
-    if (MainWindow::instance()->isModelingPerspectiveActive()) {
-      if (pModelWidget->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::Modelica) {
-        MainWindow::instance()->getShapesToolBar()->setVisible(true);
-        MainWindow::instance()->getCheckToolBar()->setVisible(true);
-        MainWindow::instance()->getSimulationToolBar()->setVisible(true);
-        MainWindow::instance()->getTLMSimulationToolbar()->setVisible(false);
-        MainWindow::instance()->getOMSimulatorToobar()->setVisible(false);
-      } else {
-        MainWindow::instance()->getShapesToolBar()->setVisible(false);
-        MainWindow::instance()->getCheckToolBar()->setVisible(false);
-        if (pModelWidget->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::Text) {
-          MainWindow::instance()->getSimulationToolBar()->setVisible(false);
-          MainWindow::instance()->getTLMSimulationToolbar()->setVisible(false);
-          MainWindow::instance()->getOMSimulatorToobar()->setVisible(false);
-        } else if (pModelWidget->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::CompositeModel) {
-          MainWindow::instance()->getSimulationToolBar()->setVisible(false);
-          MainWindow::instance()->getTLMSimulationToolbar()->setVisible(true);
-          MainWindow::instance()->getOMSimulatorToobar()->setVisible(false);
-        } else if (pModelWidget->getLibraryTreeItem()->getLibraryType() == LibraryTreeItem::OMS) {
-          MainWindow::instance()->getSimulationToolBar()->setVisible(true);
-          MainWindow::instance()->getTLMSimulationToolbar()->setVisible(false);
-          MainWindow::instance()->getOMSimulatorToobar()->setVisible(true);
-        } else {
-          qDebug() << "Unable to show/hide toolbars, unknown library type.";
-        }
-      }
-    }
     // set the focus when ModelWidget is changed so that the keyboard shortcuts can work e.g., ctrl+v
     if (pModelWidget->getIconGraphicsView() && pModelWidget->getIconGraphicsView()->isVisible()) {
       pModelWidget->getIconGraphicsView()->setFocus(Qt::ActiveWindowFocusReason);
@@ -9894,6 +9897,14 @@ void ModelWidgetContainer::currentModelWidgetChanged(QMdiSubWindow *pSubWindow)
   } else {
     MainWindow::instance()->getUndoAction()->setEnabled(false);
     MainWindow::instance()->getRedoAction()->setEnabled(false);
+  }
+  /* ticket:5441 OMEdit toolbars
+   * Show the relevant toolbars if we are in a Modeling perspective
+   */
+  if (MainWindow::instance()->isModelingPerspectiveActive()) {
+    MainWindow::instance()->showModelingPerspectiveToolBars(pModelWidget);
+  } else if (MainWindow::instance()->isDebuggingPerspectiveActive()) {
+    MainWindow::instance()->showDebuggingPerspectiveToolBars(pModelWidget);
   }
   if (!pSubWindow || mpLastActiveSubWindow == pSubWindow) {
     return;

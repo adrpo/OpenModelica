@@ -1227,20 +1227,21 @@ QString Element::getTransformationAnnotation(bool ModelicaSyntax)
   } else if (mpGraphicsView->getViewType() == StringHandler::Diagram) {
     annotationString.append(ModelicaSyntax ? "transformation(" : "transformation=transformation(");
   }
+  QStringList annotationStringList;
   // add the origin
-  annotationString.append("origin={").append(QString::number(mTransformation.getOrigin().x())).append(",");
-  annotationString.append(QString::number(mTransformation.getOrigin().y())).append("}, ");
+  if (mTransformation.getOrigin().isDynamicSelectExpression() || mTransformation.getOrigin().toQString().compare(QStringLiteral("{0,0}")) != 0) {
+    annotationStringList.append(QString("origin=%1").arg(mTransformation.getOrigin().toQString()));
+
+  }
   // add extent points
-  ExtentAnnotation extent = mTransformation.getExtent();
-  QPointF extent1 = extent.at(0);
-  QPointF extent2 = extent.at(1);
-  annotationString.append("extent={").append("{").append(QString::number(extent1.x()));
-  annotationString.append(",").append(QString::number(extent1.y())).append("},");
-  annotationString.append("{").append(QString::number(extent2.x())).append(",");
-  annotationString.append(QString::number(extent2.y())).append("}}, ");
+  if (mTransformation.getExtent().isDynamicSelectExpression() || mTransformation.getExtent().size() > 1) {
+    annotationStringList.append(QString("extent=%1").arg(mTransformation.getExtent().toQString()));
+  }
   // add icon rotation
-  annotationString.append("rotation=").append(QString::number(mTransformation.getRotateAngle())).append(")");
-  return annotationString;
+  if (mTransformation.getRotateAngle().isDynamicSelectExpression() || mTransformation.getRotateAngle().toQString().compare(QStringLiteral("0")) != 0) {
+    annotationStringList.append(QString("rotation=%1").arg(mTransformation.getRotateAngle().toQString()));
+  }
+  return annotationString.append(annotationStringList.join(",")).append(")");
 }
 
 /*!
@@ -1254,30 +1255,30 @@ QString Element::getPlacementAnnotation(bool ModelicaSyntax)
   // create the placement annotation string
   QString placementAnnotationString = ModelicaSyntax ? "annotation(Placement(" : "annotate=Placement(";
   if (mTransformation.isValid()) {
-    placementAnnotationString.append("visible=").append(mTransformation.getVisible() ? "true" : "false");
+    if (mTransformation.getVisible().isDynamicSelectExpression() || mTransformation.getVisible().toQString().compare(QStringLiteral("true")) != 0) {
+      placementAnnotationString.append(QString("visible=%1,").arg(mTransformation.getVisible().toQString()));
+    }
   }
   if ((mpLibraryTreeItem && mpLibraryTreeItem->isConnector()) || (mpGraphicsView->getModelWidget()->isNewApi() && mpModel->isConnector())) {
     if (mpGraphicsView->getViewType() == StringHandler::Icon) {
       // first get the component from diagram view and get the transformations
-      Element *pElement;
-      pElement = mpGraphicsView->getModelWidget()->getDiagramGraphicsView()->getElementObject(getName());
+      Element *pElement = mpGraphicsView->getModelWidget()->getDiagramGraphicsView()->getElementObject(getName());
       if (pElement) {
-        placementAnnotationString.append(", ").append(pElement->getTransformationAnnotation(ModelicaSyntax));
+        placementAnnotationString.append(pElement->getTransformationAnnotation(ModelicaSyntax)).append(", ");
       }
       // then get the icon transformations
-      placementAnnotationString.append(", ").append(getTransformationAnnotation(ModelicaSyntax));
+      placementAnnotationString.append(getTransformationAnnotation(ModelicaSyntax));
     } else if (mpGraphicsView->getViewType() == StringHandler::Diagram) {
       // first get the component from diagram view and get the transformations
-      placementAnnotationString.append(", ").append(getTransformationAnnotation(ModelicaSyntax));
+      placementAnnotationString.append(getTransformationAnnotation(ModelicaSyntax)).append(", ");
       // then get the icon transformations
-      Element *pElement;
-      pElement = mpGraphicsView->getModelWidget()->getIconGraphicsView()->getElementObject(getName());
+      Element *pElement = mpGraphicsView->getModelWidget()->getIconGraphicsView()->getElementObject(getName());
       if (pElement) {
-        placementAnnotationString.append(", ").append(pElement->getTransformationAnnotation(ModelicaSyntax));
+        placementAnnotationString.append(pElement->getTransformationAnnotation(ModelicaSyntax));
       }
     }
   } else {
-    placementAnnotationString.append(", ").append(getTransformationAnnotation(ModelicaSyntax));
+    placementAnnotationString.append(getTransformationAnnotation(ModelicaSyntax));
   }
   placementAnnotationString.append(ModelicaSyntax ? "))" : ")");
   return placementAnnotationString;
@@ -2240,6 +2241,34 @@ ModelInstance::Component* Element::getModelComponentByName(ModelInstance::Model 
 }
 
 /*!
+ * \brief Element::reDrawConnector
+ * Redraws the connector that collides with the connection.
+ * \param painter
+ */
+void Element::reDrawConnector(QPainter *painter)
+{
+  if (mpDefaultElementRectangle && mpDefaultElementRectangle->isVisible()) {
+    mpDefaultElementRectangle->drawAnnotation(painter, true);
+  }
+
+  if (mpDefaultElementText && mpDefaultElementText->isVisible()) {
+    mpDefaultElementText->drawAnnotation(painter, true);
+  }
+
+  foreach (Element *pInheritedElement, mInheritedElementsList) {
+    pInheritedElement->reDrawConnector(painter);
+  }
+
+  foreach (ShapeAnnotation *pShapeAnnotation, mShapesList) {
+    pShapeAnnotation->drawAnnotation(painter, true);
+  }
+
+  foreach (Element *pElement, mElementsList) {
+    pElement->reDrawConnector(painter);
+  }
+}
+
+/*!
  * \brief Element::createNonExistingElement
  * Creates a non-existing element.
  */
@@ -2743,7 +2772,7 @@ void Element::createResizerItems()
   getResizerItemsPositions(&x1, &y1, &x2, &y2);
   //Bottom left resizer
   mpBottomLeftResizerItem = new ResizerItem(this);
-  mpBottomLeftResizerItem->setPos(mapFromScene(x1, y1));
+  mpBottomLeftResizerItem->setPos(x1, y1);
   mpBottomLeftResizerItem->setResizePosition(ResizerItem::BottomLeft);
   connect(mpBottomLeftResizerItem, SIGNAL(resizerItemPressed(ResizerItem*)), SLOT(prepareResizeElement(ResizerItem*)));
   connect(mpBottomLeftResizerItem, SIGNAL(resizerItemMoved(QPointF)), SLOT(resizeElement(QPointF)));
@@ -2752,7 +2781,7 @@ void Element::createResizerItems()
   mpBottomLeftResizerItem->blockSignals(isSystemLibrary || isInheritedElement() || isOMSConnector || isOMSBusConnecor || isOMSTLMBusConnecor);
   //Top left resizer
   mpTopLeftResizerItem = new ResizerItem(this);
-  mpTopLeftResizerItem->setPos(mapFromScene(x1, y2));
+  mpTopLeftResizerItem->setPos(x1, y2);
   mpTopLeftResizerItem->setResizePosition(ResizerItem::TopLeft);
   connect(mpTopLeftResizerItem, SIGNAL(resizerItemPressed(ResizerItem*)), SLOT(prepareResizeElement(ResizerItem*)));
   connect(mpTopLeftResizerItem, SIGNAL(resizerItemMoved(QPointF)), SLOT(resizeElement(QPointF)));
@@ -2761,7 +2790,7 @@ void Element::createResizerItems()
   mpTopLeftResizerItem->blockSignals(isSystemLibrary || isInheritedElement() || isOMSConnector || isOMSBusConnecor || isOMSTLMBusConnecor);
   //Top Right resizer
   mpTopRightResizerItem = new ResizerItem(this);
-  mpTopRightResizerItem->setPos(mapFromScene(x2, y2));
+  mpTopRightResizerItem->setPos(x2, y2);
   mpTopRightResizerItem->setResizePosition(ResizerItem::TopRight);
   connect(mpTopRightResizerItem, SIGNAL(resizerItemPressed(ResizerItem*)), SLOT(prepareResizeElement(ResizerItem*)));
   connect(mpTopRightResizerItem, SIGNAL(resizerItemMoved(QPointF)), SLOT(resizeElement(QPointF)));
@@ -2770,7 +2799,7 @@ void Element::createResizerItems()
   mpTopRightResizerItem->blockSignals(isSystemLibrary || isInheritedElement() || isOMSConnector || isOMSBusConnecor || isOMSTLMBusConnecor);
   //Bottom Right resizer
   mpBottomRightResizerItem = new ResizerItem(this);
-  mpBottomRightResizerItem->setPos(mapFromScene(x2, y1));
+  mpBottomRightResizerItem->setPos(x2, y1);
   mpBottomRightResizerItem->setResizePosition(ResizerItem::BottomRight);
   connect(mpBottomRightResizerItem, SIGNAL(resizerItemPressed(ResizerItem*)), SLOT(prepareResizeElement(ResizerItem*)));
   connect(mpBottomRightResizerItem, SIGNAL(resizerItemMoved(QPointF)), SLOT(resizeElement(QPointF)));
@@ -2813,16 +2842,16 @@ void Element::showResizerItems()
   qreal x1, y1, x2, y2;
   getResizerItemsPositions(&x1, &y1, &x2, &y2);
   //Bottom left resizer
-  mpBottomLeftResizerItem->setPos(mapFromScene(x1, y1));
+  mpBottomLeftResizerItem->setPos(x1, y1);
   mpBottomLeftResizerItem->setActive();
   //Top left resizer
-  mpTopLeftResizerItem->setPos(mapFromScene(x1, y2));
+  mpTopLeftResizerItem->setPos(x1, y2);
   mpTopLeftResizerItem->setActive();
   //Top Right resizer
-  mpTopRightResizerItem->setPos(mapFromScene(x2, y2));
+  mpTopRightResizerItem->setPos(x2, y2);
   mpTopRightResizerItem->setActive();
   //Bottom Right resizer
-  mpBottomRightResizerItem->setPos(mapFromScene(x2, y1));
+  mpBottomRightResizerItem->setPos(x2, y1);
   mpBottomRightResizerItem->setActive();
 }
 
@@ -3153,6 +3182,16 @@ void Element::updatePlacementAnnotation()
 void Element::updateOriginItem()
 {
   mpOriginItem->setPos(mTransformation.getOrigin());
+  qreal x1, y1, x2, y2;
+  getResizerItemsPositions(&x1, &y1, &x2, &y2);
+  //Bottom left resizer
+  mpBottomLeftResizerItem->setPos(x1, y1);
+  //Top left resizer
+  mpTopLeftResizerItem->setPos(x1, y2);
+  //Top Right resizer
+  mpTopRightResizerItem->setPos(x2, y2);
+  //Bottom Right resizer
+  mpBottomRightResizerItem->setPos(x2, y1);
 }
 
 /*!

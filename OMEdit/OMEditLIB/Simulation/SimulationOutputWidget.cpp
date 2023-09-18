@@ -52,6 +52,9 @@
 #include <QDesktopWidget>
 #include <QTcpSocket>
 #include <QMessageBox>
+#include <QTextDocumentFragment>
+#include <QClipboard>
+#include <QDesktopServices>
 
 extern "C" {
 extern const char* System_openModelicaPlatform();
@@ -695,12 +698,16 @@ void SimulationOutputWidget::postCompilationProcessFinished(int exitCode, QProce
   }
 }
 
-void SimulationOutputWidget::postCompilationProcessFinishedHelper(int /*exitCode*/, QProcess::ExitStatus /*exitStatus*/)
+void SimulationOutputWidget::postCompilationProcessFinishedHelper(int exitCode, QProcess::ExitStatus exitStatus)
 {
   mpProgressLabel->setText(tr("Post compilation of %1 is finished.").arg(mSimulationOptions.getClassName()));
   mpProgressBar->setRange(0, 1);
-  mpProgressBar->setValue(1);
   mpCancelButton->setEnabled(false);
+  if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+    mpProgressBar->setValue(1);
+  } else {
+    mpProgressBar->setValue(0);
+  }
 }
 
 /*!
@@ -796,9 +803,9 @@ void SimulationOutputWidget::compilationProcessFinishedHelper(int exitCode, QPro
 {
   mpProgressLabel->setText(tr("Compilation of %1 is finished.").arg(mSimulationOptions.getClassName()));
   mpProgressBar->setRange(0, 1);
-  mpProgressBar->setValue(1);
   mpCancelButton->setEnabled(false);
   if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+    mpProgressBar->setValue(1);
     bool profiling = mSimulationOptions.getProfiling().compare(QStringLiteral("none")) != 0;
     if (mSimulationOptions.getBuildOnly() &&
         (OptionsDialog::instance()->getDebuggerPage()->getAlwaysShowTransformationsCheckBox()->isChecked() ||
@@ -806,6 +813,8 @@ void SimulationOutputWidget::compilationProcessFinishedHelper(int exitCode, QPro
       MainWindow::instance()->showTransformationsWidget(mSimulationOptions.getWorkingDirectory() + "/" + mSimulationOptions.getOutputFileName() + "_info.json", profiling);
     }
     MainWindow::instance()->getSimulationDialog()->showAlgorithmicDebugger(mSimulationOptions);
+  } else {
+    mpProgressBar->setValue(0);
   }
   mpArchivedSimulationItem->setStatus(Helper::finished);
   // remove the generated files
@@ -920,7 +929,6 @@ void SimulationOutputWidget::simulationProcessFinishedHelper()
   }
 
   mpProgressLabel->setText(tr("Simulation of %1 is finished.").arg(mSimulationOptions.getClassName()));
-  mpProgressBar->setValue(mpProgressBar->maximum());
   mpCancelButton->setEnabled(false);
   MainWindow::instance()->getSimulationDialog()->simulationProcessFinished(mSimulationOptions, mResultFileLastModifiedDateTime);
   mpArchivedSimulationItem->setStatus(Helper::finished);
@@ -947,7 +955,7 @@ void SimulationOutputWidget::cancelCompilationOrSimulation()
     mpCompilationProcess->kill();
     mpProgressLabel->setText(tr("Compilation of %1 is cancelled.").arg(mSimulationOptions.getClassName()));
     mpProgressBar->setRange(0, 1);
-    mpProgressBar->setValue(1);
+    mpProgressBar->setValue(0);
     mpCancelButton->setEnabled(false);
     mpArchivedSimulationItem->setStatus(Helper::finished);
   } else if (isPostCompilationProcessRunning()) {
@@ -955,14 +963,13 @@ void SimulationOutputWidget::cancelCompilationOrSimulation()
     mpPostCompilationProcess->kill();
     mpProgressLabel->setText(tr("Post compilation of %1 is cancelled.").arg(mSimulationOptions.getClassName()));
     mpProgressBar->setRange(0, 1);
-    mpProgressBar->setValue(1);
+    mpProgressBar->setValue(0);
     mpCancelButton->setEnabled(false);
     mpArchivedSimulationItem->setStatus(Helper::finished);
   } else if (isSimulationProcessRunning()) {
     setSimulationProcessKilled(true);
     mpSimulationProcess->kill();
     mpProgressLabel->setText(tr("Simulation of %1 is cancelled.").arg(mSimulationOptions.getClassName()));
-    mpProgressBar->setValue(mpProgressBar->maximum());
     mpCancelButton->setEnabled(false);
     mpArchivedSimulationItem->setStatus(Helper::finished);
   }
@@ -1144,6 +1151,7 @@ void SimulationOutputWidget::simulationProcessStarted()
     mpProgressLabel->setText(tr("Running simulation of %1. Please wait for a while.").arg(mSimulationOptions.getClassName()));
   }
   mpProgressBar->setRange(0, 100);
+  mpProgressBar->setValue(0);
   mpProgressBar->setTextVisible(true);
   mpCancelButton->setText(Helper::cancelSimulation);
   mpCancelButton->setEnabled(true);

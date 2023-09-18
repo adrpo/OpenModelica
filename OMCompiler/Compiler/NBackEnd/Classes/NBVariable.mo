@@ -93,6 +93,7 @@ public
   constant String DUMMY_DERIVATIVE_STR    = "$dDER";
   constant String PARTIAL_DERIVATIVE_STR  = "$pDER";
   constant String FUNCTION_DERIVATIVE_STR = "$fDER";
+  constant String FUNCTION_STR            = "$FUN";
   constant String PREVIOUS_STR            = "$PRE";
   constant String AUXILIARY_STR           = "$AUX";
   constant String START_STR               = "$START";
@@ -135,6 +136,7 @@ public
 
   function fromCref
     input ComponentRef cref;
+    input Attributes attr = NFAttributes.DEFAULT_ATTR;
     input Binding binding = NFBinding.EMPTY_BINDING;
     output Variable variable;
   protected
@@ -144,10 +146,10 @@ public
     SourceInfo info;
   algorithm
     node := ComponentRef.node(cref);
-    ty := ComponentRef.getSubscriptedType(cref, true);
-    vis := InstNode.visibility(node);
+    ty   := ComponentRef.getSubscriptedType(cref, true);
+    vis  := InstNode.visibility(node);
     info := InstNode.info(node);
-    variable := Variable.VARIABLE(cref, ty, binding, vis, NFAttributes.DEFAULT_ATTR, {}, {}, NONE(), info, NFBackendExtension.DUMMY_BACKEND_INFO);
+    variable := Variable.VARIABLE(cref, ty, binding, vis, attr, {}, {}, NONE(), info, NFBackendExtension.DUMMY_BACKEND_INFO);
   end fromCref;
 
   function makeVarPtrCyclic
@@ -482,6 +484,17 @@ public
     end match;
   end isDummyVariable;
 
+  function isFunctionAlias
+    input Pointer<Variable> var;
+    output Boolean b = false;
+  protected
+    String str = ComponentRef.firstName(getVarName(var));
+  algorithm
+    if stringLength(str) > 3 then
+      b := substring(str, 1, 4) == FUNCTION_STR;
+    end if;
+  end isFunctionAlias;
+
   function createTimeVar
     output Pointer<Variable> var_ptr;
   protected
@@ -533,7 +546,7 @@ public
           state := getVarPointer(cref);
           derNode := InstNode.VAR_NODE(DERIVATIVE_STR, dummy_ptr);
           der_cref := ComponentRef.append(cref, ComponentRef.fromNode(derNode, ComponentRef.scalarType(cref)));
-          var := fromCref(der_cref);
+          var := fromCref(der_cref, Variable.attributes(Pointer.access(state)));
           var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, BackendExtension.STATE_DER(state, NONE()));
           (var_ptr, der_cref) := makeVarPtrCyclic(var, der_cref);
       then ();
@@ -740,7 +753,8 @@ public
   function makePreVar
     "Creates a previous variable pointer from the discrete variable cref.
     e.g. isOpen -> $PRE.isOpen"
-    input output ComponentRef cref    "old component reference to new component reference";
+    input ComponentRef cref           "old component reference";
+    output ComponentRef pre_cref      "new component reference";
     output Pointer<Variable> var_ptr  "pointer to new variable";
   algorithm
     () := match ComponentRef.node(cref)
@@ -752,10 +766,10 @@ public
         algorithm
           disc := BVariable.getVarPointer(cref);
           qual.name := PREVIOUS_STR;
-          cref := ComponentRef.append(cref, ComponentRef.fromNode(qual, ComponentRef.scalarType(cref)));
-          var := fromCref(cref);
+          pre_cref := ComponentRef.append(cref, ComponentRef.fromNode(qual, ComponentRef.scalarType(cref)));
+          var := fromCref(pre_cref, Variable.attributes(Pointer.access(disc)));
           var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, BackendExtension.PREVIOUS(disc));
-          (var_ptr, cref) := makeVarPtrCyclic(var, cref);
+          (var_ptr, pre_cref) := makeVarPtrCyclic(var, pre_cref);
       then ();
 
       else algorithm
@@ -808,7 +822,7 @@ public
           // prepend the seed str and the matrix name and create the new cref
           qual.name := SEED_STR + "_" + name;
           cref := ComponentRef.append(cref, ComponentRef.fromNode(qual, ComponentRef.scalarType(cref)));
-          var := fromCref(cref);
+          var := fromCref(cref, NFAttributes.IMPL_DISCRETE_ATTR);
           // update the variable to be a seed and pass the pointer to the original variable
           var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, BackendExtension.SEED_VAR(old_var_ptr));
           // create the new variable pointer and safe it to the component reference
@@ -825,9 +839,10 @@ public
     "Creates a partial derivative variable pointer from a cref. Used in NBJacobian and NBHessian
     to represent generic gradient equations.
     e.g: (speed, 'Jac') -> $pDer_Jac.speed"
-    input output ComponentRef cref    "old component reference to new component reference";
+    input ComponentRef cref           "old component reference";
     input String name                 "name of the matrix this partial derivative belongs to";
     input Boolean isTmp               "sets variable kind for tmpVar or resultVar accordingly";
+    output ComponentRef pder_cref     "new component reference";
     output Pointer<Variable> var_ptr  "pointer to new variable";
   protected
     VariableKind varKind = if isTmp then BackendExtension.JAC_TMP_VAR() else BackendExtension.JAC_VAR();
@@ -841,12 +856,12 @@ public
       case qual as InstNode.VAR_NODE() algorithm
         // prepend the seed str and the matrix name and create the new cref_DIFF_DIFF
         qual.name := PARTIAL_DERIVATIVE_STR + "_" + name;
-        cref := ComponentRef.append(cref, ComponentRef.fromNode(qual, ComponentRef.scalarType(cref)));
-        var := fromCref(cref);
+        pder_cref := ComponentRef.append(cref, ComponentRef.fromNode(qual, ComponentRef.scalarType(cref)));
+        var := fromCref(pder_cref, Variable.attributes(getVar(cref)));
         // update the variable kind and pass the pointer to the original variable
         var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, varKind);
         // create the new variable pointer and safe it to the component reference
-        (var_ptr, cref) := makeVarPtrCyclic(var, cref);
+        (var_ptr, pder_cref) := makeVarPtrCyclic(var, pder_cref);
       then ();
 
       else algorithm
@@ -880,7 +895,8 @@ public
   function makeStartVar
     "Creates a start variable pointer from a cref. Used in NBInitialization.
     e.g: angle -> $START.angle"
-    input output ComponentRef cref    "old component reference to new component reference";
+    input ComponentRef cref           "old component reference";
+    output ComponentRef start_cref    "new component reference";
     output Pointer<Variable> var_ptr  "pointer to new variable";
   algorithm
     () := match ComponentRef.node(cref)
@@ -894,13 +910,13 @@ public
           old_var_ptr := BVariable.getVarPointer(cref);
           // prepend the seed str and the matrix name and create the new cref
           qual.name := START_STR;
-          cref := ComponentRef.append(cref, ComponentRef.fromNode(qual, ComponentRef.scalarType(cref)));
-          var := fromCref(cref);
+          start_cref := ComponentRef.append(cref, ComponentRef.fromNode(qual, ComponentRef.scalarType(cref)));
+          var := fromCref(start_cref, Variable.attributes(getVar(cref)));
           // update the variable to be a seed and pass the pointer to the original variable
           var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, BackendExtension.START(old_var_ptr));
           // create the new variable pointer and safe it to the component reference
           var_ptr := Pointer.create(var);
-          cref := BackendDAE.lowerComponentReferenceInstNode(cref, var_ptr);
+          start_cref := BackendDAE.lowerComponentReferenceInstNode(start_cref, var_ptr);
       then ();
 
       else algorithm
@@ -966,16 +982,41 @@ public
     cref := ComponentRef.CREF(node, iter_subs, ty, NFComponentRef.Origin.CREF, ComponentRef.EMPTY());
     var_cref := ComponentRef.CREF(node, {}, ty, NFComponentRef.Origin.CREF, ComponentRef.EMPTY());
     // create variable
-    var := fromCref(var_cref);
+    var := fromCref(var_cref, NFAttributes.IMPL_DISCRETE_ATTR);
     // update the variable to be discrete and pass the pointer to the original variable
     var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, BackendExtension.DISCRETE());
     // create the new variable pointer and safe it to the component reference
     (var_ptr, cref) := makeVarPtrCyclic(var, cref);
   end makeEventVar;
 
+  function makeAuxVar
+    "Creates an auxillary variable pointer from a unique index and context name.
+    e.g. (\"FUN\", 4) --> $FUN_4"
+    input String name                 "context name e.g. FUN";
+    input Integer uniqueIndex         "unique identifier index";
+    input Type ty                     "variable type containing dims";
+    input Boolean makeParam           "true if it is a parameter";
+    output Pointer<Variable> var_ptr  "pointer to new variable";
+    output ComponentRef cref          "new component reference";
+  protected
+    InstNode node;
+    Variable var;
+    list<Dimension> dims = Type.arrayDims(ty);
+  algorithm
+    // create inst node with dummy variable pointer and create cref from it
+    node  := InstNode.VAR_NODE(name + "_" + intString(uniqueIndex), Pointer.create(DUMMY_VARIABLE));
+    cref  := ComponentRef.CREF(node, {}, ty, NFComponentRef.Origin.CREF, ComponentRef.EMPTY());
+    var   := fromCref(cref);
+    // update the variable kind
+    var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, if makeParam then VariableKind.PARAMETER() else VariableKind.fromType(ty));
+
+    // create the new variable pointer and safe it to the component reference
+    (var_ptr, cref) := makeVarPtrCyclic(var, cref);
+  end makeAuxVar;
+
   function makeAuxStateVar
-    "Creates a generic boolean variable pointer from a unique index and context name.
-    e.g. (\"$WHEN\", 4) --> $WHEN_4"
+    "Creates a auxiliary state variable from an expression.
+    e.g. der(x^2 + y) --> der(aux)"
     input Integer uniqueIndex         "unique identifier index";
     input Option<Expression> binding  "optional binding expression";
     output Pointer<Variable> var_ptr  "pointer to new variable";
@@ -993,7 +1034,7 @@ public
     // create variable and add optional binding
     if isSome(binding) then
       bnd := Util.getOption(binding);
-      var := fromCref(cref, Binding.FLAT_BINDING(bnd, Expression.variability(bnd), NFBinding.Source.BINDING));
+      var := fromCref(cref, NFAttributes.DEFAULT_ATTR, Binding.FLAT_BINDING(bnd, Expression.variability(bnd), NFBinding.Source.BINDING));
     else
       var := fromCref(cref);
     end if;
@@ -1056,7 +1097,7 @@ public
     Pointer.update(var_ptr, var);
   end setFixed;
 
-  function setBindingAsStartAndFix
+  function setBindingAsStart
     "use this if a binding is found out to be constant, remove variable to known vars (param/const)
     NOTE: this overwrites the old start value. throw error/warning if different?"
     input output Pointer<Variable> var_ptr;
@@ -1072,7 +1113,6 @@ public
       case Variable.VARIABLE(backendinfo = binfo as BackendExtension.BACKEND_INFO()) algorithm
         start := Binding.getExp(var.binding);
         binfo.attributes := BackendExtension.VariableAttributes.setStartAttribute(binfo.attributes, start);
-        binfo.attributes := BackendExtension.VariableAttributes.setFixed(binfo.attributes, var.ty);
         var.backendinfo := binfo;
       then var;
 
@@ -1081,6 +1121,14 @@ public
       then fail();
     end match;
     Pointer.update(var_ptr, var);
+  end setBindingAsStart;
+
+  function setBindingAsStartAndFix
+    input output Pointer<Variable> var_ptr;
+    input Boolean b = true;
+  algorithm
+    var_ptr := setBindingAsStart(var_ptr);
+    var_ptr := setFixed(var_ptr, b);
   end setBindingAsStartAndFix;
 
   function hasNonTrivialAliasBinding
@@ -1814,7 +1862,7 @@ public
     end setVariables;
 
     // used to add specific types. Fill up with Jacobian/Hessian types
-    type VarType = enumeration(STATE, STATE_DER, ALGEBRAIC, DISCRETE, DISC_STATE, PREVIOUS, START, ITERATOR);
+    type VarType = enumeration(STATE, STATE_DER, ALGEBRAIC, DISCRETE, DISC_STATE, PREVIOUS, START, PARAMETER, ITERATOR);
 
     function addTypedList
       input output VarData varData;
@@ -1848,9 +1896,21 @@ public
           varData.initials := VariablePointers.addList(var_lst, varData.initials);
         then varData;
 
+        case (VAR_DATA_SIM(), VarType.DISCRETE) algorithm
+          varData.variables := VariablePointers.addList(var_lst, varData.variables);
+          varData.unknowns := VariablePointers.addList(var_lst, varData.unknowns);
+          varData.discretes := VariablePointers.addList(var_lst, varData.discretes);
+          varData.initials := VariablePointers.addList(var_lst, varData.initials);
+        then varData;
+
         case (VAR_DATA_SIM(), VarType.START) algorithm
           varData.variables := VariablePointers.addList(var_lst, varData.variables);
           varData.initials := VariablePointers.addList(var_lst, varData.initials);
+        then varData;
+
+        case (VAR_DATA_SIM(), VarType.PARAMETER) algorithm
+          varData.parameters := VariablePointers.addList(var_lst, varData.parameters);
+          varData.knowns := VariablePointers.addList(var_lst, varData.knowns);
         then varData;
 
         case (VAR_DATA_SIM(), VarType.ITERATOR) algorithm

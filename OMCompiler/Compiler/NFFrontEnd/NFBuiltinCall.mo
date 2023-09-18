@@ -70,6 +70,8 @@ protected
 
 public
   function needSpecialHandling
+    "Returns whether or not a call refers to a builtin function that doesn't
+     follow normal Modelica rules and instead needs special handling."
     input Call call;
     output Boolean special;
   algorithm
@@ -421,7 +423,7 @@ protected
     //  TypeCheck.checkValidOperatorOverload("'String'", fn, recopnode);
     //end for;
 
-    matchedFunctions := Function.matchFunctionsSilent(candidates, args, namedArgs, info);
+    matchedFunctions := Function.matchFunctionsSilent(candidates, args, namedArgs, context, info);
     exactMatches := MatchedFunction.getExactMatches(matchedFunctions);
     if listEmpty(exactMatches) then
       Error.addSourceMessage(Error.NO_MATCHING_FUNCTION_FOUND_NFINST,
