@@ -351,7 +351,7 @@ void TextAnnotation::paint(QPainter *painter, const QStyleOptionGraphicsItem *op
         painter->setOpacity(0.2);
       }
     }
-    drawAnnotation(painter, false);
+    drawAnnotation(painter);
   }
 }
 
@@ -359,9 +359,8 @@ void TextAnnotation::paint(QPainter *painter, const QStyleOptionGraphicsItem *op
  * \brief TextAnnotation::drawAnnotation
  * Draws the text.
  * \param painter
- * \param scene
  */
-void TextAnnotation::drawAnnotation(QPainter *painter, bool scene)
+void TextAnnotation::drawAnnotation(QPainter *painter)
 {
   applyLinePattern(painter);
   /* Don't apply the fill patterns on Text shapes. */
@@ -397,7 +396,7 @@ void TextAnnotation::drawAnnotation(QPainter *painter, bool scene)
     sy = scaleY;
   }
   // map the existing bounding rect to new transformation
-  QRectF boundingRectangle = scene ? mapToScene(boundingRect()).boundingRect() : boundingRect();
+  QRectF boundingRectangle = boundingRect();
   QRectF mappedBoundingRect = QRectF(boundingRectangle.x() * sx, boundingRectangle.y() * sy, boundingRectangle.width() * sx, boundingRectangle.height() * sy);
   // map the existing bounding rect to new transformation but with positive width and height so that font metrics can work
   QRectF absMappedBoundingRect = QRectF(boundingRectangle.x() * sx, boundingRectangle.y() * sy, qAbs(boundingRectangle.width() * sx), qAbs(boundingRectangle.height() * sy));
@@ -605,7 +604,7 @@ void TextAnnotation::updateTextStringHelper(QRegExp regExp)
             OMCInterface::convertUnits_res convertUnit = pOMCProxy->convertUnits(unit, displayUnit);
             if (convertUnit.unitsCompatible) {
               qreal convertedValue = Utilities::convertUnit(textValue.toDouble(), convertUnit.offset, convertUnit.scaleFactor);
-              textValue = StringHandler::number(convertedValue, textValue);
+              textValue = StringHandler::number(convertedValue);
               textValueWithDisplayUnit = QString("%1 %2").arg(textValue, Utilities::convertUnitToSymbol(displayUnit));
             } else {
               textValueWithDisplayUnit = QString("%1 %2").arg(textValue, Utilities::convertUnitToSymbol(unit));

@@ -37,6 +37,7 @@ encapsulated package NBInitialization
 
 protected
   // NF imports
+  import Algorithm = NFAlgorithm;
   import BackendExtension = NFBackendExtension;
   import Call = NFCall;
   import ComponentRef = NFComponentRef;
@@ -46,6 +47,8 @@ protected
   import NFFunction.Function;
   import NFFlatten.{FunctionTree, FunctionTreeImpl};
   import NFInstNode.InstNode;
+  import Operator = NFOperator;
+  import Statement = NFStatement;
   import Subscript = NFSubscript;
   import Type = NFType;
   import Variable = NFVariable;
@@ -53,13 +56,14 @@ protected
   // Backend imports
   import BackendDAE = NBackendDAE;
   import BEquation = NBEquation;
-  import NBEquation.{Equation, EquationPointers, EqData, EquationAttributes, EquationKind, Iterator, WhenEquationBody};
+  import NBEquation.{Equation, EquationPointers, EqData, EquationAttributes, EquationKind, Iterator, WhenEquationBody, WhenStatement, IfEquationBody};
   import BVariable = NBVariable;
   import NBVariable.{VariablePointer, VariablePointers, VarData};
   import Causalize = NBCausalize;
   import Jacobian = NBJacobian;
   import Module = NBModule;
   import Partitioning = NBPartitioning;
+  import Replacements = NBReplacements;
   import NBSystem;
   import NBSystem.System;
   import Tearing = NBTearing;
@@ -87,7 +91,8 @@ public
           algorithm
             // create the equations from fixed variables.
             (variables, equations, initialEqs) := createStartEquations(varData.states, variables, equations, initialEqs, eqData.uniqueIndex, "State");
-            (variables, equations, initialEqs) := createStartEquations(varData.discretes, variables, equations, initialEqs, eqData.uniqueIndex, "Discrete State");
+            (variables, equations, initialEqs) := createStartEquations(varData.discretes, variables, equations, initialEqs, eqData.uniqueIndex, "Discretes");
+            (variables, equations, initialEqs) := createStartEquations(varData.discrete_states, variables, equations, initialEqs, eqData.uniqueIndex, "Discrete States");
             (equations, initialEqs, initialVars) := createParameterEquations(varData.parameters, equations, initialEqs, initialVars, eqData.uniqueIndex);
 
             varData.variables := variables;
@@ -166,6 +171,8 @@ public
         Pointer<Variable> var_ptr, start_var;
         Pointer<Equation> start_eq;
         EquationKind kind;
+        Option<Expression> start_exp_opt;
+        Expression start_exp;
 
       // if it is an array create for equation
       case Variable.VARIABLE() guard BVariable.isFixed(state) and BVariable.isArray(state) algorithm
@@ -175,10 +182,20 @@ public
       // create scalar equation
       case Variable.VARIABLE() guard BVariable.isFixed(state) algorithm
         name := BVariable.getVarName(state);
-        (var_ptr, name, start_var, start_name) := createStartVar(state, name, {});
+        start_exp_opt := BVariable.getStartAttribute(state);
+        if Util.isSome(start_exp_opt) and Expression.variability(Util.getOption(start_exp_opt)) > NFPrefixes.Variability.STRUCTURAL_PARAMETER then
+          // use the start attribute itself if it is not constant
+          SOME(start_exp) := start_exp_opt;
+        else
+          // create a start variable if it is constant
+          (var_ptr, name, start_var, start_name) := createStartVar(state, name, {});
+          start_exp := Expression.fromCref(start_name);
+          Pointer.update(ptr_start_vars, start_var :: Pointer.access(ptr_start_vars));
+        end if;
+
+        // make the new start equation
         kind := if BVariable.isContinuous(state) then EquationKind.CONTINUOUS else EquationKind.DISCRETE;
-        start_eq := Equation.makeAssignment(name, Expression.fromCref(start_name), idx, NBEquation.START_STR, Iterator.EMPTY(), EquationAttributes.default(kind, true));
-        Pointer.update(ptr_start_vars, start_var :: Pointer.access(ptr_start_vars));
+        start_eq := Equation.makeAssignment(Expression.fromCref(name), start_exp, idx, NBEquation.START_STR, Iterator.EMPTY(), EquationAttributes.default(kind, true));
         Pointer.update(ptr_start_eqs, start_eq :: Pointer.access(ptr_start_eqs));
       then ();
 
@@ -198,19 +215,20 @@ public
     output Pointer<Variable> start_var;
     output ComponentRef start_name;
   protected
+    Option<Pointer<Variable>> pre_post = BVariable.getPrePost(var_ptr);
     Pointer<Variable> disc_state_var;
     ComponentRef merged_name;
   algorithm
-    if BVariable.isDiscreteState(var_ptr) then
-      // for discrete states change the lhs cref to the $PRE cref
-      merged_name := ComponentRef.mergeSubscripts(subscripts, name, true, true);
-      name := BVariable.getPreCref(name);
-      name := ComponentRef.mergeSubscripts(subscripts, name, true, true);
-      var_ptr := BVariable.getVarPointer(name);
-    elseif BVariable.isPrevious(var_ptr) then
+    if BVariable.isPrevious(var_ptr) and Util.isSome(pre_post) then
       // for previous change the rhs to the start value of the discrete state
-      merged_name := BVariable.getDiscreteStateCref(name);
+      merged_name := BVariable.getVarName(Util.getOption(pre_post));
       merged_name := ComponentRef.mergeSubscripts(subscripts, merged_name, true, true);
+    elseif Util.isSome(pre_post) then
+      // for vars with previous change the lhs cref to the $PRE cref
+      merged_name := ComponentRef.mergeSubscripts(subscripts, name, true, true);
+      var_ptr := Util.getOption(pre_post);
+      name := BVariable.getVarName(var_ptr);
+      name := ComponentRef.mergeSubscripts(subscripts, name, true, true);
     else
       // just apply subscripts and make start var
       name := ComponentRef.mergeSubscripts(subscripts, name, true, true);
@@ -259,6 +277,8 @@ public
     input Pointer<list<Pointer<Equation>>> ptr_start_eqs;
     input Pointer<Integer> idx;
   protected
+    Option<Expression> start_exp_opt;
+    Expression start_exp;
     Pointer<Variable> var_ptr, start_var;
     ComponentRef name, start_name;
     list<Dimension> dims;
@@ -269,56 +289,83 @@ public
     list<tuple<ComponentRef, Expression>> frames;
     Pointer<Equation> start_eq;
     EquationKind kind;
+    Call array_constructor;
+    UnorderedMap<ComponentRef, Expression> replacements;
+    InstNode old_iter;
+    ComponentRef new_iter;
   algorithm
     var_ptr := Slice.getT(state);
+    // make unique iterators for the new for-loop
     name    := BVariable.getVarName(var_ptr);
-    dims    := Type.arrayDims(ComponentRef.nodeType(name));
+    dims    := Type.arrayDims(ComponentRef.getSubscriptedType(name));
     (iterators, ranges, subscripts) := Flatten.makeIterators(name, dims);
     iter_crefs := list(ComponentRef.makeIterator(iter, Type.INTEGER()) for iter in iterators);
     iter_crefs := list(BackendDAE.lowerIteratorCref(iter) for iter in iter_crefs);
     subscripts := list(Subscript.mapExp(sub, BackendDAE.lowerIteratorExp) for sub in subscripts);
     frames  := List.zip(iter_crefs, ranges);
     (var_ptr, name, start_var, start_name) := createStartVar(var_ptr, name, subscripts);
+
+    start_exp_opt := BVariable.getStartAttribute(var_ptr);
+    if Util.isSome(start_exp_opt) and Expression.variability(Util.getOption(start_exp_opt)) > NFPrefixes.Variability.STRUCTURAL_PARAMETER then
+      // use the start attribute itself if it is not constant
+      // discard start_var/start_name
+      SOME(start_exp) := start_exp_opt;
+      // if it is some kind of array repeating structure, extract the repeated element e.g. fill()
+      start_exp := match start_exp
+        case Expression.CALL(call = array_constructor as Call.TYPED_ARRAY_CONSTRUCTOR()) algorithm
+          replacements := UnorderedMap.new<Expression>(ComponentRef.hash, ComponentRef.isEqual);
+          for tpl in List.zip(array_constructor.iters, frames) loop
+            ((old_iter, _), (new_iter, _)) := tpl;
+            UnorderedMap.add(ComponentRef.fromNode(old_iter, InstNode.getType(old_iter)), Expression.fromCref(new_iter), replacements);
+          end for;
+        then Expression.map(array_constructor.exp, function Replacements.applySimpleExp(replacements = replacements));
+        else start_exp;
+      end match;
+    else
+      // create a start variable if it is constant
+      start_exp := Expression.fromCref(start_name);
+      Pointer.update(ptr_start_vars, start_var :: Pointer.access(ptr_start_vars));
+    end if;
+
+    // make the new start equation
     kind := if BVariable.isContinuous(var_ptr) then EquationKind.CONTINUOUS else EquationKind.DISCRETE;
-    start_eq := Equation.makeAssignment(name, Expression.fromCref(start_name), idx, NBEquation.START_STR, Iterator.fromFrames(frames), EquationAttributes.default(kind, true));
+    start_eq := Equation.makeAssignment(Expression.fromCref(name), start_exp, idx, NBEquation.START_STR, Iterator.fromFrames(frames), EquationAttributes.default(kind, true));
     if not listEmpty(state.indices) then
       // empty list indicates full array, slice otherwise
       (start_eq, _, _) := Equation.slice(start_eq, state.indices, NONE(), FunctionTreeImpl.EMPTY());
     end if;
-    Pointer.update(ptr_start_vars, start_var :: Pointer.access(ptr_start_vars));
     Pointer.update(ptr_start_eqs, start_eq :: Pointer.access(ptr_start_eqs));
   end createStartEquationSlice;
 
   function createPreEquation
     "creates d = $PRE.d equations"
-    input Pointer<Variable> disc_state;
+    input Pointer<Variable> var_ptr;
     input Pointer<list<Pointer<Equation>>> ptr_pre_eqs;
     input Pointer<Integer> idx;
+  protected
+    Option<Pointer<Variable>> pre;
+    Pointer<Equation> pre_eq;
+    EquationKind kind;
   algorithm
-    () := match Pointer.access(disc_state)
-      local
-        Pointer<Variable> previous;
-        Pointer<Equation> pre_eq;
-        EquationKind kind;
-
-      case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.VariableKind.DISCRETE_STATE(previous = previous)))
-        algorithm
-          kind := if BVariable.isContinuous(disc_state) then EquationKind.CONTINUOUS else EquationKind.DISCRETE;
-          pre_eq := Equation.makeAssignment(BVariable.getVarName(disc_state), Expression.fromCref(BVariable.getVarName(previous)), idx, NBEquation.PRE_STR, Iterator.EMPTY(), EquationAttributes.default(kind, true));
-          Pointer.update(ptr_pre_eqs, pre_eq :: Pointer.access(ptr_pre_eqs));
-      then ();
-      else ();
-    end match;
+    if not BVariable.isPrevious(var_ptr) then
+      pre := BVariable.getPrePost(var_ptr);
+      if Util.isSome(pre) then
+        kind := if BVariable.isContinuous(var_ptr) then EquationKind.CONTINUOUS else EquationKind.DISCRETE;
+        pre_eq := Equation.makeAssignment(Expression.fromCref(BVariable.getVarName(var_ptr)), Expression.fromCref(BVariable.getVarName(Util.getOption(pre))), idx, NBEquation.PRE_STR, Iterator.EMPTY(), EquationAttributes.default(kind, true));
+        Pointer.update(ptr_pre_eqs, pre_eq :: Pointer.access(ptr_pre_eqs));
+      end if;
+    end if;
   end createPreEquation;
 
   function createPreEquationSlice
     "creates a pre equation for a sliced variable.
     usually results in a for equation, but might be scalarized if that is not possible."
-    input Slice<VariablePointer> disc_state;
+    input Slice<VariablePointer> var_slice;
     input Pointer<list<Pointer<Equation>>> ptr_pre_eqs;
     input Pointer<Integer> idx;
   protected
     Pointer<Variable> var_ptr;
+    Option<Pointer<Variable>> pre;
     ComponentRef name, pre_name;
     list<Dimension> dims;
     list<InstNode> iterators;
@@ -328,24 +375,29 @@ public
     Pointer<Equation> pre_eq;
     EquationKind kind;
   algorithm
-    var_ptr := Slice.getT(disc_state);
-    name    := BVariable.getVarName(var_ptr);
-    dims    := Type.arrayDims(ComponentRef.nodeType(name));
-    (iterators, ranges, subscripts) := Flatten.makeIterators(name, dims);
-    frames  := List.zip(list(ComponentRef.makeIterator(iter, Type.INTEGER()) for iter in iterators), ranges);
+    var_ptr := Slice.getT(var_slice);
+    if not BVariable.isPrevious(var_ptr) then
+      pre := BVariable.getPrePost(var_ptr);
+      if Util.isSome(pre) then
+        name    := BVariable.getVarName(var_ptr);
+        dims    := Type.arrayDims(ComponentRef.getSubscriptedType(name));
+        (iterators, ranges, subscripts) := Flatten.makeIterators(name, dims);
+        frames  := List.zip(list(ComponentRef.makeIterator(iter, Type.INTEGER()) for iter in iterators), ranges);
 
-    pre_name := BVariable.getPreCref(name);
-    pre_name := ComponentRef.mergeSubscripts(subscripts, pre_name, true, true);
-    name := ComponentRef.mergeSubscripts(subscripts, name, true, true);
+        pre_name := BVariable.getVarName(Util.getOption(pre));
+        pre_name := ComponentRef.mergeSubscripts(subscripts, pre_name, true, true);
+        name := ComponentRef.mergeSubscripts(subscripts, name, true, true);
 
-    kind := if BVariable.isContinuous(var_ptr) then EquationKind.CONTINUOUS else EquationKind.DISCRETE;
-    pre_eq := Equation.makeAssignment(name, Expression.fromCref(pre_name), idx, NBEquation.PRE_STR, Iterator.fromFrames(frames), EquationAttributes.default(kind, true));
+        kind := if BVariable.isContinuous(var_ptr) then EquationKind.CONTINUOUS else EquationKind.DISCRETE;
+        pre_eq := Equation.makeAssignment(Expression.fromCref(name), Expression.fromCref(pre_name), idx, NBEquation.PRE_STR, Iterator.fromFrames(frames), EquationAttributes.default(kind, true));
 
-    if not listEmpty(disc_state.indices) then
-      // empty list indicates full array, slice otherwise
-      (pre_eq, _, _) := Equation.slice(pre_eq, disc_state.indices, NONE(), FunctionTreeImpl.EMPTY());
+        if not listEmpty(var_slice.indices) then
+          // empty list indicates full array, slice otherwise
+          (pre_eq, _, _) := Equation.slice(pre_eq, var_slice.indices, NONE(), FunctionTreeImpl.EMPTY());
+        end if;
+        Pointer.update(ptr_pre_eqs, pre_eq :: Pointer.access(ptr_pre_eqs));
+      end if;
     end if;
-    Pointer.update(ptr_pre_eqs, pre_eq :: Pointer.access(ptr_pre_eqs));
   end createPreEquationSlice;
 
   function cleanup
@@ -452,6 +504,152 @@ public
       else exp;
     end match;
   end cleanupHomotopy;
+
+  function removeWhenEquation
+    "this function checks if an equation has to be removed before initialization.
+    true for: when branch without condition initial()"
+    input output Equation eqn;
+  algorithm
+    eqn := match eqn
+      local
+        Equation new_eqn;
+        list<Statement> stmts;
+        Option<IfEquationBody> if_body;
+
+      // reduce the body of for equations
+      case Equation.FOR_EQUATION() algorithm
+        eqn.body := list(removeWhenEquation(b) for b in eqn.body);
+      then if List.all(eqn.body, Equation.isDummy) then Equation.DUMMY_EQUATION() else eqn;
+
+      // reduce the body of when equations
+      case Equation.WHEN_EQUATION() algorithm
+        stmts := removeWhenEquationBody(SOME(eqn.body));
+        if not listEmpty(stmts) then
+          new_eqn := Pointer.access(Equation.makeAlgorithm(stmts, true));
+          new_eqn := Equation.setResidualVar(new_eqn, Equation.getResidualVar(Pointer.create(eqn)));
+        else
+          new_eqn := Equation.DUMMY_EQUATION();
+        end if;
+      then new_eqn;
+
+      // reduce the body of if equations
+      case Equation.IF_EQUATION() algorithm
+        eqn.body := removeWhenEquationIfBody(eqn.body);
+        eqn.size := IfEquationBody.size(eqn.body);
+      then if eqn.size > 0 then eqn else Equation.DUMMY_EQUATION();
+
+      // reduce the body of algorithms
+      case Equation.ALGORITHM() algorithm
+        stmts := removeWhenEquationAlgorithmBody(eqn.alg.statements);
+        if not listEmpty(stmts) then
+          new_eqn := Pointer.access(Equation.makeAlgorithm(stmts, true));
+          new_eqn := Equation.setResidualVar(new_eqn, Equation.getResidualVar(Pointer.create(eqn)));
+        else
+          new_eqn := Equation.DUMMY_EQUATION();
+        end if;
+      then new_eqn;
+
+      else eqn;
+    end match;
+  end removeWhenEquation;
+
+  function removeWhenEquationBody
+    input Option<WhenEquationBody> body_opt;
+    output list<Statement> stmts;
+  algorithm
+    stmts := match body_opt
+      local
+        WhenEquationBody body;
+
+      case SOME(body) algorithm
+        if isInitialCall(body.condition) then
+          // this is kept, return the statements
+          stmts := list(WhenStatement.toStatement(st) for st in body.when_stmts);
+        else
+          // dig deeper
+          stmts := removeWhenEquationBody(body.else_when);
+        end if;
+      then stmts;
+
+      else {};
+    end match;
+  end removeWhenEquationBody;
+
+  function removeWhenEquationIfBody
+    input output IfEquationBody body;
+  algorithm
+    body.then_eqns := list(Pointer.apply(e, removeWhenEquation) for e in body.then_eqns);
+    if Util.isSome(body.else_if) then
+      body.else_if := SOME(removeWhenEquationIfBody(Util.getOption(body.else_if)));
+    end if;
+  end removeWhenEquationIfBody;
+
+  function removeWhenEquationAlgorithmBody
+    input list<Statement> in_stmts;
+    output list<Statement> out_stmts;
+  protected
+    list<list<Statement>> stmts = {};
+  algorithm
+    for stmt in listReverse(in_stmts) loop
+      stmts := removeWhenEquationStatement(stmt) :: stmts;
+    end for;
+    out_stmts := List.flatten(stmts);
+  end removeWhenEquationAlgorithmBody;
+
+  function removeWhenEquationStatement
+    input Statement stmt;
+    output list<Statement> out_stmts = {};
+  algorithm
+    out_stmts := match stmt
+      local
+        Expression cond;
+        list<Statement> stmts;
+        list<list<Statement>> stmts_acc = {};
+
+      case Statement.WHEN() algorithm
+        for tpl in stmt.branches loop
+          (cond, stmts) := tpl;
+          if isInitialCall(cond) then
+            out_stmts := stmts;
+            break;
+          end if;
+        end for;
+      then out_stmts;
+
+      case Statement.FOR() algorithm
+        for body_stmt in listReverse(stmt.body) loop
+          stmts_acc := removeWhenEquationStatement(body_stmt) :: stmts_acc;
+        end for;
+        stmts := List.flatten(stmts_acc);
+        if not listEmpty(stmts) then
+          stmt.body := stmts;
+          out_stmts := {stmt};
+        else
+          out_stmts := {};
+        end if;
+      then out_stmts;
+
+      else {stmt};
+    end match;
+  end removeWhenEquationStatement;
+
+  function isInitialCall
+    "checks if the expression is an initial call or can be simplified to be one.
+    ToDo: better apprach is to replace all initial calls with true and see if the expression can be simplified to true.
+    do this once ExpressionSimplify is mature enough"
+    input Expression condition;
+    output Boolean b;
+  algorithm
+    b := match condition
+      // it's an initial call -> true;
+      case Expression.CALL() then Call.isNamed(condition.call, "initial");
+      // its an "or" expression, check if either argument is an initial call
+      case Expression.LBINARY(operator = Operator.OPERATOR(op = NFOperator.Op.OR))
+      then isInitialCall(condition.exp1) or isInitialCall(condition.exp2);
+      // not an initial call. Ignore "and" constructs
+      else false;
+    end match;
+  end isInitialCall;
 
   annotation(__OpenModelica_Interface="backend");
 end NBInitialization;

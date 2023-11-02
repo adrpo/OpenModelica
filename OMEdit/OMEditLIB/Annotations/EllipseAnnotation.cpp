@@ -155,7 +155,7 @@ void EllipseAnnotation::paint(QPainter *painter, const QStyleOptionGraphicsItem 
   Q_UNUSED(option);
   Q_UNUSED(widget);
   if (mVisible) {
-    drawAnnotation(painter, false);
+    drawAnnotation(painter);
   }
 }
 
@@ -163,17 +163,13 @@ void EllipseAnnotation::paint(QPainter *painter, const QStyleOptionGraphicsItem 
  * \brief EllipseAnnotation::drawAnnotation
  * Draws the ellipse.
  * \param painter
- * \param scene
  */
-void EllipseAnnotation::drawAnnotation(QPainter *painter, bool scene)
+void EllipseAnnotation::drawAnnotation(QPainter *painter)
 {
+  QRectF boundingRectangle = boundingRect();
   // first we invert the painter since we have our coordinate system inverted.
   // inversion is required to draw the elliptic curves at correct angles.
   painter->scale(1.0, -1.0);
-  QRectF boundingRectangle = boundingRect();
-  if (scene) {
-    boundingRectangle = mapToScene(boundingRect()).boundingRect();
-  }
   painter->translate(0, ((-boundingRectangle.top()) - boundingRectangle.bottom()));
   applyLinePattern(painter);
   if (mClosure != StringHandler::ClosureNone) {
@@ -181,9 +177,6 @@ void EllipseAnnotation::drawAnnotation(QPainter *painter, bool scene)
   }
 
   boundingRectangle = getBoundingRect();
-  if (scene) {
-    boundingRectangle = mapToScene(getBoundingRect()).boundingRect();
-  }
   if (mClosure == StringHandler::ClosureNone) {
     painter->drawArc(boundingRectangle, mStartAngle*16, mEndAngle*16 - mStartAngle*16);
   } else if (mClosure == StringHandler::ClosureChord) {
@@ -249,7 +242,7 @@ QString EllipseAnnotation::getShapeAnnotation()
   // get the closure
   if (mClosure.isDynamicSelectExpression() || !((mStartAngle == 0 && mEndAngle == 360 && mClosure.toQString().compare(QStringLiteral("EllipseClosure.Chord")) == 0)
                                                 || (!(mStartAngle == 0 && mEndAngle == 360) && mClosure.toQString().compare(QStringLiteral("EllipseClosure.Radial")) == 0))) {
-    annotationString.append(QString("closure=%1").append(mClosure.toQString()));
+    annotationString.append(QString("closure=%1").arg(mClosure.toQString()));
   }
   return QString("Ellipse(").append(annotationString.join(",")).append(")");
 }

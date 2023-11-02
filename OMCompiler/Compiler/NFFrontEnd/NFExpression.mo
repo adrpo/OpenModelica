@@ -1833,7 +1833,7 @@ public
 
       case BOX() then "BOX(" + toString(exp.exp) + ")";
       case UNBOX() then "UNBOX(" + toString(exp.exp) + ")";
-      case SUBSCRIPTED_EXP() then toString(exp.exp) + Subscript.toStringList(exp.subscripts);
+      case SUBSCRIPTED_EXP() then "(" + toString(exp.exp) + ")" + Subscript.toStringList(exp.subscripts);
       case TUPLE_ELEMENT() then toString(exp.tupleExp) + "[" + intString(exp.index) + "]";
       case RECORD_ELEMENT() then toString(exp.recordExp) + "[field: " + exp.fieldName + "]";
       case MUTABLE() then toString(Mutable.access(exp.exp));
@@ -1980,7 +1980,7 @@ public
         str := stringAppendList(strl);
       end if;
     else
-      str := toFlatString(exp) + Subscript.toFlatStringList(subscripts);
+      str := "(" + toFlatString(exp) + ")" + Subscript.toFlatStringList(subscripts);
     end if;
   end toFlatSubscriptedString;
 
@@ -2297,6 +2297,8 @@ public
                                list(toDAE(arg) for arg in exp.args),
                                Type.toDAE(exp.ty),
                                Type.toDAE(Type.FUNCTION(fn, NFType.FunctionType.FUNCTIONAL_VARIABLE)));
+
+      case MUTABLE() then toDAE(Mutable.access(exp.exp));
 
       else
         algorithm
@@ -5787,21 +5789,6 @@ public
       else exp;
     end match;
   end mapSplitExpressions3;
-
-  function hasNonArrayIteratorSubscript
-    "Returns true if the given iterator is only used to subscript array
-     expression in the given expression, otherwise false."
-    input Expression exp;
-    input InstNode iterator;
-    output Boolean res;
-  algorithm
-    res := match exp
-      case CREF() then containsIterator(exp, iterator);
-      case SUBSCRIPTED_EXP() then not isArray(exp.exp) and
-        Subscript.listContainsExp(exp.subscripts, function containsIterator(iterator = iterator));
-      else containsShallow(exp, function hasNonArrayIteratorSubscript(iterator = iterator));
-    end match;
-  end hasNonArrayIteratorSubscript;
 
   function mapCrefScalars
     "Takes a cref expression and applies a function to each scalar cref,

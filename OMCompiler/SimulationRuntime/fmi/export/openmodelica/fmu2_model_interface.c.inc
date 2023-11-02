@@ -377,7 +377,7 @@ fmi2Status internalEventIteration(fmi2Component c, fmi2EventInfo *eventInfo)
   fmi2Status status = fmi2OK;
   eventInfo->newDiscreteStatesNeeded = fmi2True;
   eventInfo->terminateSimulation     = fmi2False;
-  while (eventInfo->newDiscreteStatesNeeded && !eventInfo->terminateSimulation) {
+  while (eventInfo->newDiscreteStatesNeeded && !eventInfo->terminateSimulation && status != fmi2Error) {
     status = internalEventUpdate((ModelInstance *)c, eventInfo);
   }
   return status;
@@ -1361,6 +1361,10 @@ fmi2Status fmi2GetFMUstate(fmi2Component c, fmi2FMUstate* FMUstate)
   //infoRingBuffer( fmudata->simulationData);
   //printRingBufferSimulationData(fmudata->simulationData, fmudata); // original ringBuffer data
   //printRingBufferSimulationData(internal_state->simulationData, fmudata); // copied ringBuffer data
+
+  /* release previous fmu state if existent */
+  /* TODO: ideally, previous state's memory should be re-used instead of re-allocation */
+  if (*FMUstate != NULL) fmi2FreeFMUstate(c, FMUstate);
 
   // return the fmu state
   *FMUstate = (fmi2FMUstate) internal_state;

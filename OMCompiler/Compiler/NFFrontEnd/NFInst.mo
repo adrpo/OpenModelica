@@ -124,6 +124,11 @@ constant InstSettings DEFAULT_SETTINGS = InstSettings.SETTINGS(
     mergeExtendsSections = true
   );
 
+//function Inst_test
+//  input SCode.Program program;
+//  external "C" Inst_test(program);
+//end Inst_test;
+
 function instClassInProgram
   "Instantiates a class given by its fully qualified path, with the result being
    a DAE."
@@ -141,6 +146,7 @@ protected
   InstContext.Type context;
   Integer var_count, eq_count;
 algorithm
+  //Inst_test(program);
   resetGlobalFlags();
   context := if relaxedFrontend or Flags.getConfigBool(Flags.CHECK_MODEL) or Flags.isSet(Flags.NF_API) then
     NFInstContext.RELAXED else NFInstContext.NO_CONTEXT;
@@ -354,6 +360,7 @@ algorithm
       ErrorExt.rollBack(getInstanceName());
     else
       ErrorExt.delCheckpoint(getInstanceName());
+      fail();
     end try;
   end try;
 
@@ -2539,6 +2546,9 @@ algorithm
       local
         Expression bind_exp;
 
+      // Binding is removed by a break, change it to an unbound binding.
+      case Binding.RAW_BINDING(bindingExp = Absyn.Exp.BREAK()) then Binding.UNBOUND();
+
       case Binding.RAW_BINDING()
         algorithm
           bind_exp := instExp(binding.bindingExp, binding.scope, context, binding.info);
@@ -2686,6 +2696,7 @@ algorithm
       then instPartEvalFunction(absynExp.function_, absynExp.functionArgs, scope, context, info);
 
     case Absyn.Exp.END() then Expression.END();
+    case Absyn.Exp.EXPRESSIONCOMMENT() then instExp(absynExp.exp, scope, context, info);
 
     case Absyn.Exp.SUBSCRIPTED_EXP()
       then Expression.SUBSCRIPTED_EXP(
@@ -2694,8 +2705,6 @@ algorithm
         Type.UNKNOWN(),
         false
       );
-
-    case Absyn.Exp.EXPRESSIONCOMMENT() then instExp(absynExp.exp, scope, context, info);
 
     else
       algorithm
@@ -3072,6 +3081,19 @@ algorithm
       case SCode.Equation.EQ_NORETCALL(exp = Absyn.Exp.CALL(function_ = Absyn.ComponentRef.CREF_IDENT(name = name)))
           guard name == "transition" or name == "initialState"
         then eq :: outEql;
+
+      case SCode.Equation.EQ_FOR()
+        algorithm
+          eq.eEquationLst := filterInstanceAPIEquations(eq.eEquationLst);
+        then
+          if listEmpty(eq.eEquationLst) then outEql else eq :: outEql;
+
+      case SCode.Equation.EQ_IF()
+        algorithm
+          eq.thenBranch := list(filterInstanceAPIEquations(eql) for eql in eq.thenBranch);
+          eq.elseBranch := filterInstanceAPIEquations(eq.elseBranch);
+        then
+          if List.all(eq.thenBranch, listEmpty) and listEmpty(eq.elseBranch) then outEql else eq :: outEql;
 
       else outEql;
     end match;
@@ -3562,7 +3584,7 @@ algorithm
       // to give a diagnostic message.
       if not InstContext.inInstanceAPI(context) then
         try
-          Absyn.STRING(str) := SCodeUtil.getElementNamedAnnotation(
+          SOME(Absyn.STRING(str)) := SCodeUtil.lookupElementAnnotationBinding(
             InstNode.definition(InstNode.classScope(n)), "missingInnerMessage");
           Error.addSourceMessage(Error.MISSING_INNER_MESSAGE, {System.unescapedString(str)}, InstNode.info(n));
         else

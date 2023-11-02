@@ -1141,7 +1141,7 @@ protected
 algorithm
   try
     SOME(SCode.COMMENT(annotation_=SOME(ann))) := comment;
-    val := SCodeUtil.getNamedAnnotation(ann, "tearingSelect");
+    SOME(val) := SCodeUtil.lookupAnnotationBinding(ann, "tearingSelect");
     ts_str := AbsynUtil.crefIdent(AbsynUtil.expCref(val));
     ts := match(ts_str)
       case "always" then SOME(BackendDAE.ALWAYS());
@@ -1171,7 +1171,7 @@ protected
 algorithm
   try
     SOME(SCode.COMMENT(annotation_=SOME(ann))) := comment;
-    val := SCodeUtil.getNamedAnnotation(ann, "HideResult");
+    SOME(val) := SCodeUtil.lookupAnnotationBinding(ann, "HideResult");
     hr := Expression.fromAbsynExp(val);
 
     hideResult := match(inCref)
@@ -7945,6 +7945,9 @@ algorithm
     funcs := getFunctions(inShared);
     (syst, _, _, mapEqnIncRow, mapIncRowEqn) := getAdjacencyMatrixScalar(inSystem, BackendDAE.NORMAL(), SOME(funcs), isInitializationDAE(inShared));
     (outSystem, _) := BackendDAETransform.strongComponentsScalar(syst, inShared, mapEqnIncRow, mapIncRowEqn);
+    if Flags.isSet(Flags.DUMP_SCC_GRAPHML) then
+      dumpStrongComponents(outSystem, inShared);
+    end if;
   else
     //BackendDump.dumpEqSystem(inSystem, "Transformation module sort components failed for following system:");
     Error.addInternalError("Transformation module sort components failed", sourceInfo());
@@ -7957,17 +7960,16 @@ function dumpStrongComponents
   input BackendDAE.EqSystem isyst;
   input BackendDAE.Shared ishared;
 algorithm
-  if Flags.isSet(Flags.DUMP_SCC_GRAPHML) then return; end if;
-  _ := match(isyst, ishared)
+  () := match ishared
     local
       String fileName, fileNamePrefix;
       Integer seqNo;
 
-    case (_, BackendDAE.SHARED(info = BackendDAE.EXTRA_INFO(fileNamePrefix=fileNamePrefix)))
-      equation
-        seqNo = System.tmpTickIndex(Global.backendDAE_fileSequence);
-        fileName = fileNamePrefix + "_" + intString(seqNo) + "_Comps" + intString(systemSize(isyst)) + ".graphml";
-        DumpGraphML.dumpSystem(isyst,ishared,NONE(),fileName,false);
+    case BackendDAE.SHARED(info = BackendDAE.EXTRA_INFO(fileNamePrefix = fileNamePrefix))
+      algorithm
+        seqNo := System.tmpTickIndex(Global.backendDAE_fileSequence);
+        fileName := fileNamePrefix + "_" + intString(seqNo) + "_Comps" + intString(systemSize(isyst)) + ".graphml";
+        DumpGraphML.dumpSystem(isyst, ishared, NONE(), fileName, false);
       then ();
 
   end match;
@@ -10274,10 +10276,12 @@ algorithm
   syst := match syst
     local
       BackendDAE.StrongComponents comps;
+      UnorderedSet<DAE.ComponentRef> set = UnorderedSet.new(ComponentReference.hashComponentRef, ComponentReference.crefEqual);
     case BackendDAE.EQSYSTEM(matching = BackendDAE.MATCHING(comps = comps)) algorithm
       for comp in comps loop
-        syst.orderedVars := markNonlinearIterationVariablesStrongComponent(comp, syst.orderedVars);
+        markNonlinearIterationVariablesStrongComponent(comp, set);
       end for;
+      (syst.orderedVars, _) := BackendVariable.traverseBackendDAEVarsWithUpdate(syst.orderedVars, markNonlinearIterationVariable, set);
     then syst;
     else syst;
   end match;
@@ -10285,10 +10289,9 @@ end markNonlinearIterationVariablesEqSystem;
 
 protected function markNonlinearIterationVariablesStrongComponent
   input BackendDAE.StrongComponent comp;
-  input output BackendDAE.Variables vars;
+  input UnorderedSet<DAE.ComponentRef> set;
 protected
   list<BackendDAE.Var> nonlinear_iteration_vars;
-  UnorderedSet<DAE.ComponentRef> set = UnorderedSet.new(ComponentReference.hashComponentRef, ComponentReference.crefEqual);
 algorithm
   nonlinear_iteration_vars := match comp
     local
@@ -10300,8 +10303,6 @@ algorithm
   for var in nonlinear_iteration_vars loop
     UnorderedSet.add(var.varName, set);
   end for;
-
-  (vars, _) := BackendVariable.traverseBackendDAEVarsWithUpdate(vars, markNonlinearIterationVariable, set);
 end markNonlinearIterationVariablesStrongComponent;
 
 protected function markNonlinearIterationVariable

@@ -277,8 +277,6 @@ private:
 
     CoordinateSystem mCoordinateSystem;
     CoordinateSystem mMergedCoOrdinateSystem;
-
-    static IconDiagramAnnotation defaultIconDiagramAnnotation;
   private:
     Model *mpParentModel;
     QList<Shape*> mGraphics;
@@ -391,8 +389,8 @@ private:
     Annotation(Model *pParentModel);
     void deserialize(const QJsonObject &jsonObject);
 
-    IconDiagramAnnotation *getIconAnnotation() const;
-    IconDiagramAnnotation *getDiagramAnnotation() const;
+    IconDiagramAnnotation *getIconAnnotation() const {return mpIconAnnotation.get();}
+    IconDiagramAnnotation *getDiagramAnnotation() const {return mpDiagramAnnotation.get();}
     const BooleanAnnotation &isState() const {return mState;}
     // Element annotation
     const BooleanAnnotation &isChoicesAllMatching() const {return mChoicesAllMatching;}
@@ -462,18 +460,29 @@ private:
     void setName(const QString &name) {mName = name;}
     const QString &getValue() const {return mValue;}
     QString getValueWithoutQuotes() const {return StringHandler::removeFirstLastQuotes(getValue());}
-    QString getValueWithSubModifiers() const;
-    QString getModifier(const QString &m) const;
-    bool hasModifier(const QString &m) const;
+    QString toString() const;
+    Modifier getModifier(const QString &m) const;
+    QString getModifierValue(const QString &m) const;
+    bool hasModifier(const QString &modifier) const;
     const QList<Modifier> &getModifiers() const {return mModifiers;}
     bool isFinal() const {return mFinal;}
     bool isEach() const {return mEach;}
+    bool isRedeclare() const {return mRedeclare;}
+    bool isReplaceable() const {return mReplaceable;}
     QString getModifierValue(QStringList qualifiedModifierName) const;
+
+    QString printEach() const;
+    QString printFinal() const;
+    QString printRedeclare() const;
+    QString printReplaceable() const;
+
   private:
     QString mName;
     QString mValue;
-    bool mFinal;
-    bool mEach;
+    bool mFinal = false;
+    bool mEach = false;
+    bool mRedeclare = false;
+    bool mReplaceable = false;
     QList<Modifier> mModifiers;
 
     static QString getModifierValue(const Modifier &modifier, const QString &modifierName, QStringList qualifiedModifierName);
@@ -584,7 +593,7 @@ private:
 
     bool isParameterConnectorSizing(const QString &parameter);
     bool isValidConnection(const Name &lhsConnector, const Name &rhsConnector) const;
-    bool isTypeCompatibleWith(const Model &other) const;
+    bool isTypeCompatibleWith(const Model &other, bool lhsOutside, bool rhsOutside) const;
     QString getParameterValue(const QString &parameter, QString &typeName);
     QString getParameterValueFromExtendsModifiers(const QString &parameter);
 

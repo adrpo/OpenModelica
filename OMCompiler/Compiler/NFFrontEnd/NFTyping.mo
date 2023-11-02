@@ -110,6 +110,9 @@ uniontype TypingError
   end isError;
 end TypingError;
 
+// Used by typeDimension for catching cyclic dimension involving :
+constant Expression WHOLEDIM_CREF = Expression.CREF(Type.UNKNOWN(), ComponentRef.STRING(":", ComponentRef.EMPTY()));
+
 public
 function typeClass
   input InstNode cls;
@@ -654,6 +657,9 @@ algorithm
       algorithm
         b := binding;
         parent_dims := 0;
+        // Update the dimension as processing, using a : cref to get the correct
+        // error message if there are cycles.
+        arrayUpdate(dimensions, index, Dimension.UNTYPED(WHOLEDIM_CREF, true));
 
         if Binding.isUnbound(binding) then
           // If the component has no binding, try to use its parent's binding
@@ -3840,7 +3846,7 @@ algorithm
   dim1 := Type.nthDimension(InstNode.getType(node1), index1);
   dim2 := Type.nthDimension(InstNode.getType(node2), index2);
 
-  if not Dimension.isEqualKnown(dim1, dim2) then
+  if not Dimension.isEqualKnownSize(dim1, node1, index1, dim2, node2, index2) then
     Error.addSourceMessage(Error.INCOMPATIBLE_IMPLICIT_RANGES,
       {String(index1), ComponentRef.toString(cref1),
        String(index2), ComponentRef.toString(cref2)}, info);

@@ -1126,6 +1126,7 @@ algorithm
     case "dgetri" algorithm EvalFunctionExt.Lapack_dgetri(args); then ();
     case "dgeqpf" algorithm EvalFunctionExt.Lapack_dgeqpf(args); then ();
     case "dorgqr" algorithm EvalFunctionExt.Lapack_dorgqr(args); then ();
+    case "dhseqr" algorithm EvalFunctionExt.Lapack_dhseqr(args); then ();
     else fail();
   end match;
 end evaluateExternal3;
@@ -1348,7 +1349,7 @@ protected
   list<SCode.Mod> mods;
   Absyn.Exp exp;
 algorithm
-  mods := SCodeUtil.lookupNamedAnnotations(ann, name);
+  mods := SCodeUtil.lookupAnnotations(ann, name);
 
   for m in mods loop
     strl := match m

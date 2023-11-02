@@ -100,6 +100,7 @@ public
   extends Module.resolveSingularitiesInterface;
     input list<list<Integer>> marked_eqns_lst;
   protected
+    UnorderedSet<Integer> marked_eqns_set;
     list<Integer> marked_eqns;
     SlicingStatus status;
     Pointer<Equation> constraint, sliced_eqn, diffed_eqn;
@@ -118,7 +119,14 @@ public
   algorithm
     if not listEmpty(marked_eqns_lst) then
       changed := true;
-      marked_eqns := List.unique(List.flatten(marked_eqns_lst));
+      // marked_eqns_lst to flat uniqie list (via UnorderedSet)
+      marked_eqns_set := UnorderedSet.new(Util.id, intEq, Util.nextPrime(sum(listLength(l) for l in marked_eqns_lst)));
+      for lst in marked_eqns_lst loop
+        for e in lst loop
+          UnorderedSet.add(e, marked_eqns_set);
+        end for;
+      end for;
+      marked_eqns := UnorderedSet.toList(marked_eqns_set);
       // --------------------------------------------------------
       //      1. BASIC INDEX REDUCTION
       // --------------------------------------------------------
@@ -319,8 +327,8 @@ public
       for var in unmatched_vars loop
         var_ptr := Slice.getT(var);
         if BVariable.isFixable(var_ptr) then
-          if BVariable.isDiscreteState(var_ptr) then
-            // create previous equations for discrete states
+          if BVariable.hasPre(var_ptr) then
+            // create previous equations
             // d = $PRE.d
             Initialization.createPreEquationSlice(var, ptr_start_eqns, idx);
           else

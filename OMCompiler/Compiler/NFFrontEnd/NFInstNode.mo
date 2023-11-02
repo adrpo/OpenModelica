@@ -44,6 +44,7 @@ import Pointer;
 import Error;
 import Prefixes = NFPrefixes;
 import Visibility = NFPrefixes.Visibility;
+import AccessLevel = NFPrefixes.AccessLevel;
 import NFModifier.Modifier;
 import SCodeDump;
 import DAE;
@@ -1481,6 +1482,8 @@ uniontype InstNode
         then referenceEq(Pointer.access(node1.cls), Pointer.access(node2.cls));
       case (COMPONENT_NODE(), COMPONENT_NODE())
         then referenceEq(Pointer.access(node1.component), Pointer.access(node2.component));
+      case (VAR_NODE(), VAR_NODE())
+        then referenceEq(Pointer.access(node1.varPointer), Pointer.access(node2.varPointer));
       // Other nodes like ref nodes might be equal, but we neither know nor care.
       else false;
     end match;
@@ -2084,6 +2087,33 @@ uniontype InstNode
     InstNodeType.TOP_SCOPE(generatedInners = inners) := nodeType(InstNode.topScope(node));
     UnorderedMap.clear(inners);
   end clearGeneratedInners;
+
+  function getAccessLevel
+    input InstNode node;
+    output Option<AccessLevel> access = NONE();
+  protected
+    InstNode scope;
+    SCode.Mod access_mod;
+    Option<Absyn.Exp> access_exp;
+  algorithm
+    scope := classScope(parent(resolveInner(node)));
+
+    while isClass(scope) loop
+      access_mod := SCodeUtil.lookupElementAnnotation(definition(scope), "Protection");
+      access_mod := SCodeUtil.lookupModInMod("access", access_mod);
+      access_exp := SCodeUtil.getModifierBinding(access_mod);
+
+      if isSome(access_exp) then
+        access := Prefixes.accessLevelFromAbsyn(Util.getOption(access_exp));
+
+        if isSome(access) then
+          return;
+        end if;
+      end if;
+
+      scope := parent(scope);
+    end while;
+  end getAccessLevel;
 end InstNode;
 
 annotation(__OpenModelica_Interface="frontend");

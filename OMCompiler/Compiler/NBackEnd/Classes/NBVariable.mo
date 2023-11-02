@@ -46,7 +46,7 @@ public
   //NF Imports
   import Attributes = NFAttributes;
   import BackendExtension = NFBackendExtension;
-  import NFBackendExtension.{BackendInfo, VariableKind};
+  import NFBackendExtension.{BackendInfo, VariableKind, VariableAttributes};
   import NFBinding.Binding;
   import ComponentRef = NFComponentRef;
   import Dimension = NFDimension;
@@ -87,7 +87,7 @@ public
   constant Variable TIME_VARIABLE = Variable.VARIABLE(NFBuiltin.TIME_CREF, Type.REAL(),
     NFBinding.EMPTY_BINDING, NFPrefixes.Visibility.PUBLIC, NFAttributes.DEFAULT_ATTR,
     {}, {}, NONE(), SCodeUtil.dummyInfo, BackendExtension.BACKEND_INFO(
-    VariableKind.TIME(), NFBackendExtension.EMPTY_VAR_ATTR_REAL));
+    VariableKind.TIME(), NFBackendExtension.EMPTY_VAR_ATTR_REAL, NFBackendExtension.EMPTY_ANNOTATIONS, NONE()));
 
   constant String DERIVATIVE_STR          = "$DER";
   constant String DUMMY_DERIVATIVE_STR    = "$dDER";
@@ -109,7 +109,7 @@ public
   protected
     String attr;
   algorithm
-    attr := BackendExtension.VariableAttributes.toString(var.backendinfo.attributes);
+    attr := VariableAttributes.toString(var.backendinfo.attributes);
     str := str + VariableKind.toString(var.backendinfo.varKind) + " (" + intString(Variable.size(var)) + ") " + Variable.toString(var) + (if attr == "" then "" else " " + attr);
   end toString;
 
@@ -117,6 +117,11 @@ public
     input Pointer<Variable> var_ptr;
     output String str = toString(Pointer.access(var_ptr));
   end pointerToString;
+
+  function nameString
+    input Pointer<Variable> var_ptr;
+    output String str = ComponentRef.toString(getVarName(var_ptr));
+  end nameString;
 
   function hash
     input Pointer<Variable> var_ptr;
@@ -164,6 +169,20 @@ public
     var.name := name;
     Pointer.update(var_ptr, var);
   end makeVarPtrCyclic;
+
+  function connectPrePostVar
+    "sets the pre() var for the variable and also sets the variable pointer at the pre() variable"
+    input Pointer<Variable> var_ptr;
+    input Pointer<Variable> pre_ptr;
+  protected
+    Variable var = Pointer.access(var_ptr);
+    Variable pre = Pointer.access(pre_ptr);
+  algorithm
+    var.backendinfo := BackendInfo.setPrePost(var.backendinfo, SOME(pre_ptr));
+    pre.backendinfo := BackendInfo.setPrePost(pre.backendinfo, SOME(var_ptr));
+    Pointer.update(var_ptr, var);
+    Pointer.update(pre_ptr, pre);
+  end connectPrePostVar;
 
   function getVar
     input ComponentRef cref;
@@ -326,6 +345,39 @@ public
     end match;
   end isPrevious;
 
+  function getPrePost
+    "gets the pre() / previous() var if its a variable / clocked variable or the other way around"
+    input Pointer<Variable> var_ptr;
+    output Option<Pointer<Variable>> pre_post;
+  protected
+    Variable var = Pointer.access(var_ptr);
+  algorithm
+    pre_post := var.backendinfo.pre_post;
+  end getPrePost;
+
+  function getPrePostCref
+    "only use if you are sure there is a pre-post variable"
+    input ComponentRef cref;
+    output ComponentRef pre_post;
+  protected
+    Option<Pointer<Variable>> pre_post_opt;
+  algorithm
+    pre_post_opt := getPrePost(getVarPointer(cref));
+    if Util.isSome(pre_post_opt) then
+      pre_post := getVarName(Util.getOption(pre_post_opt));
+    else
+      Error.addMessage(Error.INTERNAL_ERROR,{getInstanceName() + " failed for " + ComponentRef.toString(cref) + " because it had no pre or post variable."});
+      fail();
+    end if;
+  end getPrePostCref;
+
+  function hasPre
+    "only returns true if the variable itself is not a pre() or previous() and has a pre() pointer set"
+    extends checkVar;
+  algorithm
+    b := not isPrevious(var_ptr) and Util.isSome(getPrePost(var_ptr));
+  end hasPre;
+
   function isDummyState extends checkVar;
   algorithm
     b := match Pointer.access(var_ptr)
@@ -422,10 +474,11 @@ public
   algorithm
     b := match Pointer.access(var_ptr)
       case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.STATE()))             then not isFixed(var_ptr);
-      case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.DISCRETE()))          then not isFixed(var_ptr);
-      case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.DISCRETE_STATE()))    then true;
-      case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.PREVIOUS()))          then not isFixed(getDiscreteStateVar(var_ptr));
+      case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.ALGEBRAIC()))         then not isFixed(var_ptr) or hasPre(var_ptr);
+      case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.DISCRETE()))          then not isFixed(var_ptr) or hasPre(var_ptr);
+      case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.DISCRETE_STATE()))    then not isFixed(var_ptr) or hasPre(var_ptr);
       case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.PARAMETER()))         then not isFixed(var_ptr);
+      case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.PREVIOUS()))          then true;
       else false;
     end match;
   end isFixable;
@@ -437,18 +490,23 @@ public
   algorithm
     b := match Pointer.access(var_ptr)
       local
-        BackendExtension.VariableAttributes attributes;
+        VariableAttributes attributes;
       case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(attributes = attributes))
-      then BackendExtension.VariableAttributes.getStateSelect(attributes) == stateSelect;
+      then VariableAttributes.getStateSelect(attributes) == stateSelect;
       else algorithm
         Error.addMessage(Error.INTERNAL_ERROR,{getInstanceName() + " failed for " + toString(Pointer.access(var_ptr))});
       then fail();
     end match;
   end isStateSelect;
 
+  function getVariableAttributes
+    input Variable var;
+    output VariableAttributes variableAttributes = var.backendinfo.attributes;
+  end getVariableAttributes;
+
   function setVariableAttributes
     input output Variable var;
-    input BackendExtension.VariableAttributes variableAttributes;
+    input VariableAttributes variableAttributes;
   algorithm
     var := match var
       local
@@ -564,8 +622,6 @@ public
     state_var := match Pointer.access(der_var)
       case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.STATE_DER(state = state_var)))
       then state_var;
-      case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.PREVIOUS(state = state_var)))
-      then state_var;
       else algorithm
           Error.addMessage(Error.INTERNAL_ERROR,{getInstanceName() + " failed for " + pointerToString(der_var) + " because of wrong variable kind."});
         then fail();
@@ -583,10 +639,6 @@ public
         Variable stateVar;
       case ComponentRef.CREF(node = InstNode.VAR_NODE(varPointer = derivative)) then match Pointer.access(derivative)
         case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.STATE_DER(state = state)))
-          algorithm
-            stateVar := Pointer.access(state);
-        then stateVar.name;
-        case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.PREVIOUS(state = state)))
           algorithm
             stateVar := Pointer.access(state);
         then stateVar.name;
@@ -636,43 +688,6 @@ public
       then fail();
     end match;
   end getDerCref;
-
-  function getDiscreteStateVar
-    input Pointer<Variable> pre_var;
-    output Pointer<Variable> state_var;
-  algorithm
-    state_var := match Pointer.access(pre_var)
-      case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.PREVIOUS(state = state_var)))
-      then state_var;
-      else algorithm
-          Error.addMessage(Error.INTERNAL_ERROR,{getInstanceName() + " failed for " + pointerToString(pre_var) + " because of wrong variable kind."});
-        then fail();
-    end match;
-  end getDiscreteStateVar;
-
-  function getDiscreteStateCref
-    "Returns the discrete state variable component reference from a previous reference.
-    Only works after the discrete state has been detected by the DetectStates module and fails for non-previous crefs!"
-    input output ComponentRef cref;
-  algorithm
-    cref := match cref
-      local
-        Pointer<Variable> previous, state;
-        Variable stateVar;
-      case ComponentRef.CREF(node = InstNode.VAR_NODE(varPointer = previous)) then match Pointer.access(previous)
-        case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.PREVIOUS(state = state)))
-          algorithm
-            stateVar := Pointer.access(state);
-        then stateVar.name;
-        else algorithm
-          Error.addMessage(Error.INTERNAL_ERROR,{getInstanceName() + " failed for " + ComponentRef.toString(cref) + " because of wrong variable kind."});
-        then fail();
-      end match;
-      else algorithm
-        Error.addMessage(Error.INTERNAL_ERROR,{getInstanceName() + " failed for " + ComponentRef.toString(cref) + " because of wrong InstNode type."});
-      then fail();
-    end match;
-  end getDiscreteStateCref;
 
   function getRecordChildren
     "returns all children of the variable if its a record, otherwise returns empty list"
@@ -741,35 +756,34 @@ public
   function makeDiscreteStateVar
     "Updates a discrete variable pointer to be a discrete state, requires the pointer to its left limit (pre) variable."
     input Pointer<Variable> varPointer;
-    input Pointer<Variable> previous;
   protected
-    Variable var;
+    Variable var = Pointer.access(varPointer);
   algorithm
-    var := Pointer.access(varPointer);
-    var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, BackendExtension.DISCRETE_STATE(previous, false));
+    var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, BackendExtension.DISCRETE_STATE(false));
     Pointer.update(varPointer, var);
   end makeDiscreteStateVar;
 
   function makePreVar
-    "Creates a previous variable pointer from the discrete variable cref.
+    "Creates a previous variable pointer from the variable cref.
     e.g. isOpen -> $PRE.isOpen"
     input ComponentRef cref           "old component reference";
     output ComponentRef pre_cref      "new component reference";
-    output Pointer<Variable> var_ptr  "pointer to new variable";
+    output Pointer<Variable> pre_ptr  "pointer to new variable";
   algorithm
     () := match ComponentRef.node(cref)
       local
         InstNode qual;
-        Pointer<Variable> disc;
-        Variable var;
+        Pointer<Variable> var_ptr;
+        Variable pre;
       case qual as InstNode.VAR_NODE()
         algorithm
-          disc := BVariable.getVarPointer(cref);
+          var_ptr := BVariable.getVarPointer(cref);
           qual.name := PREVIOUS_STR;
           pre_cref := ComponentRef.append(cref, ComponentRef.fromNode(qual, ComponentRef.scalarType(cref)));
-          var := fromCref(pre_cref, Variable.attributes(Pointer.access(disc)));
-          var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, BackendExtension.PREVIOUS(disc));
-          (var_ptr, pre_cref) := makeVarPtrCyclic(var, pre_cref);
+          pre := fromCref(pre_cref, Variable.attributes(Pointer.access(var_ptr)));
+          pre.backendinfo := BackendExtension.BackendInfo.setVarKind(pre.backendinfo, BackendExtension.PREVIOUS());
+          (pre_ptr, pre_cref) := makeVarPtrCyclic(pre, pre_cref);
+          connectPrePostVar(var_ptr, pre_ptr);
       then ();
 
       else algorithm
@@ -777,30 +791,6 @@ public
       then fail();
     end match;
   end makePreVar;
-
-  function getPreCref
-    "Returns the previous variable component reference from a discrete componet reference.
-    Only works after the discrete state has been detected by the DetectStates module and fails for non-discrete-state crefs!"
-    input output ComponentRef cref;
-  algorithm
-    cref := match cref
-      local
-        Pointer<Variable> disc, previous;
-        Variable preVar;
-      case ComponentRef.CREF(node = InstNode.VAR_NODE(varPointer = disc)) then match Pointer.access(disc)
-        case Variable.VARIABLE(backendinfo = BackendExtension.BACKEND_INFO(varKind = BackendExtension.DISCRETE_STATE(previous = previous)))
-          algorithm
-            preVar := Pointer.access(previous);
-        then preVar.name;
-        else algorithm
-          Error.addMessage(Error.INTERNAL_ERROR,{getInstanceName() + " failed for " + ComponentRef.toString(cref) + " because of wrong variable kind."});
-        then fail();
-      end match;
-      else algorithm
-        Error.addMessage(Error.INTERNAL_ERROR,{getInstanceName() + " failed for " + ComponentRef.toString(cref) + " because of wrong InstNode type."});
-      then fail();
-    end match;
-  end getPreCref;
 
   function makeSeedVar
     "Creates a seed variable pointer from a cref. Used in NBJacobian and NBHessian
@@ -985,6 +975,7 @@ public
     var := fromCref(var_cref, NFAttributes.IMPL_DISCRETE_ATTR);
     // update the variable to be discrete and pass the pointer to the original variable
     var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, BackendExtension.DISCRETE());
+    var.backendinfo := BackendExtension.BackendInfo.setHideResult(var.backendinfo, true);
     // create the new variable pointer and safe it to the component reference
     (var_ptr, cref) := makeVarPtrCyclic(var, cref);
   end makeEventVar;
@@ -1007,8 +998,9 @@ public
     node  := InstNode.VAR_NODE(name + "_" + intString(uniqueIndex), Pointer.create(DUMMY_VARIABLE));
     cref  := ComponentRef.CREF(node, {}, ty, NFComponentRef.Origin.CREF, ComponentRef.EMPTY());
     var   := fromCref(cref);
-    // update the variable kind
+    // update the variable kind and set hideResult = true
     var.backendinfo := BackendExtension.BackendInfo.setVarKind(var.backendinfo, if makeParam then VariableKind.PARAMETER() else VariableKind.fromType(ty));
+    var.backendinfo := BackendExtension.BackendInfo.setHideResult(var.backendinfo, true);
 
     // create the new variable pointer and safe it to the component reference
     (var_ptr, cref) := makeVarPtrCyclic(var, cref);
@@ -1086,7 +1078,7 @@ public
         Expression start;
 
       case Variable.VARIABLE(backendinfo = binfo as BackendExtension.BACKEND_INFO()) algorithm
-        binfo.attributes := BackendExtension.VariableAttributes.setFixed(binfo.attributes, var.ty, b);
+        binfo.attributes := VariableAttributes.setFixed(binfo.attributes, var.ty, b);
         var.backendinfo := binfo;
       then var;
 
@@ -1112,7 +1104,7 @@ public
 
       case Variable.VARIABLE(backendinfo = binfo as BackendExtension.BACKEND_INFO()) algorithm
         start := Binding.getExp(var.binding);
-        binfo.attributes := BackendExtension.VariableAttributes.setStartAttribute(binfo.attributes, start);
+        binfo.attributes := VariableAttributes.setStartAttribute(binfo.attributes, start);
         var.backendinfo := binfo;
       then var;
 
@@ -1130,6 +1122,11 @@ public
     var_ptr := setBindingAsStart(var_ptr);
     var_ptr := setFixed(var_ptr, b);
   end setBindingAsStartAndFix;
+
+  function getStartAttribute
+    input Pointer<Variable> var_ptr;
+    output Option<Expression> start =  VariableAttributes.getStartAttribute(getVariableAttributes(Pointer.access(var_ptr)));
+  end getStartAttribute;
 
   function hasNonTrivialAliasBinding
     "returns true if the binding does not represent a cref, a negated cref or a constant.
@@ -1680,10 +1677,13 @@ public
       VariablePointers derivatives        "State derivatives (der(x) -> $DER.x)";
       VariablePointers algebraics         "Algebraic variables";
       VariablePointers discretes          "Discrete variables";
-      VariablePointers previous           "Previous discrete variables (pre(d) -> $PRE.d)";
+      VariablePointers discrete_states    "Discrete state variables";
+      VariablePointers previous           "Previous variables (pre(d) -> $PRE.d)";
+      // clocked
 
       /* subset of knowns */
       VariablePointers states             "States";
+      VariablePointers top_level_inputs   "Top level inputs";
       VariablePointers parameters         "Parameters";
       VariablePointers constants          "Constants";
       VariablePointers records            "Records";
@@ -1752,6 +1752,28 @@ public
 
     record VAR_DATA_EMPTY end VAR_DATA_EMPTY;
 
+    function size
+      input VarData varData;
+      output Integer s;
+    algorithm
+      s := match varData
+        case VAR_DATA_SIM() then VariablePointers.size(varData.unknowns);
+        case VAR_DATA_JAC() then VariablePointers.size(varData.unknowns);
+        case VAR_DATA_HES() then VariablePointers.size(varData.unknowns);
+      end match;
+    end size;
+
+    function scalarSize
+      input VarData varData;
+      output Integer s;
+    algorithm
+      s := match varData
+        case VAR_DATA_SIM() then VariablePointers.scalarSize(varData.unknowns);
+        case VAR_DATA_JAC() then VariablePointers.scalarSize(varData.unknowns);
+        case VAR_DATA_HES() then VariablePointers.scalarSize(varData.unknowns);
+      end match;
+    end scalarSize;
+
     function toString
       input VarData varData;
       input Integer level = 0;
@@ -1789,7 +1811,9 @@ public
               VariablePointers.toString(varData.derivatives, "Derivative", false) +
               VariablePointers.toString(varData.algebraics, "Algebraic", false) +
               VariablePointers.toString(varData.discretes, "Discrete", false) +
+              VariablePointers.toString(varData.discrete_states, "Discrete States", false) +
               VariablePointers.toString(varData.previous, "Previous", false) +
+              VariablePointers.toString(varData.top_level_inputs, "Top Level Inputs", false) +
               VariablePointers.toString(varData.parameters, "Parameter", false) +
               VariablePointers.toString(varData.constants, "Constant", false) +
               VariablePointers.toString(varData.records, "Record", false) +

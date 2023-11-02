@@ -91,7 +91,8 @@ public
       case (System.SystemType.INI, BackendDAE.MAIN(varData = BVariable.VAR_DATA_SIM(initials = variables), eqData = BEquation.EQ_DATA_SIM(initials = equations)))
         algorithm
           // ToDo: check if when equation is active during initialization
-          equations := EquationPointers.mapRemovePtr(equations, Equation.isWhenEquation);
+          equations := EquationPointers.map(equations, Initialization.removeWhenEquation);
+          equations := EquationPointers.compress(equations);
           bdae.init := list(sys for sys guard(not System.System.isEmpty(sys)) in partitioningNone(systemType, variables, equations));
         then bdae;
 
@@ -447,7 +448,7 @@ protected
     if BVariable.isState(var_ptr) then
       UnorderedSet.add(BVariable.getDerCref(cref), set);
     elseif BVariable.isPrevious(var_ptr) then
-      UnorderedSet.add(BVariable.getStateCref(cref), set);
+      UnorderedSet.add(BVariable.getPrePostCref(cref), set);
     else
       UnorderedSet.add(cref, set);
     end if;

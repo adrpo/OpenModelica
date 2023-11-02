@@ -867,6 +867,12 @@ algorithm
   (_, top) := mkTop(SymbolTable.getAbsyn(), AbsynUtil.pathString(classPath));
   mod := parseModifier(modifier, top);
   cls_node := Inst.lookupRootClass(classPath, top, context);
+
+  if SCodeUtil.isFunction(InstNode.definition(cls_node)) then
+    context := InstContext.unset(context, NFInstContext.CLASS);
+    context := InstContext.set(context, NFInstContext.FUNCTION);
+  end if;
+
   cls_node := Inst.instantiateRootClass(cls_node, context, mod);
   execStat("Inst.instantiateRootClass");
   inst_tree := buildInstanceTree(cls_node);
@@ -888,8 +894,9 @@ algorithm
   Inst.clearCaches();
 end getModelInstance;
 
-function getModelInstanceIcon
+function getModelInstanceAnnotation
   input Absyn.Path classPath;
+  input list<String> filter;
   input Boolean prettyPrint;
   output Values.Value res;
 protected
@@ -904,10 +911,10 @@ algorithm
   cls_node := Inst.lookupRootClass(classPath, top, context);
   cls_node := InstNode.resolveInner(cls_node);
 
-  json := dumpJSONInstanceIcon(cls_node);
+  json := dumpJSONInstanceAnnotation(cls_node, filter);
   res := Values.STRING(JSON.toString(json, prettyPrint));
   Inst.clearCaches();
-end getModelInstanceIcon;
+end getModelInstanceAnnotation;
 
 function parseModifier
   input String modifierValue;
@@ -1108,8 +1115,9 @@ algorithm
   json := JSON.addPair("source", dumpJSONSourceInfo(InstNode.info(node)), json);
 end dumpJSONInstanceTree;
 
-function dumpJSONInstanceIcon
+function dumpJSONInstanceAnnotation
   input InstNode node;
+  input list<String> filter;
   output JSON json = JSON.makeNull();
 protected
   Option<SCode.Comment> cmt;
@@ -1136,7 +1144,7 @@ algorithm
     j := JSON.emptyArray();
 
     for ext in exts loop
-      j := JSON.addElement(dumpJSONInstanceIconExtends(ext), j);
+      j := JSON.addElement(dumpJSONInstanceAnnotationExtends(ext, filter), j);
     end for;
 
     json := JSON.addPair("elements", j, json);
@@ -1147,8 +1155,11 @@ algorithm
   cmt := match cmt
     case SOME(SCode.Comment.COMMENT(annotation_ = SOME(ann as SCode.Annotation.ANNOTATION())))
       algorithm
-        ann.modification := SCodeUtil.filterSubMods(ann.modification,
-          function SCodeUtil.filterGivenSubModNames(namesToKeep = {"Icon", "IconMap"}));
+        if not listEmpty(filter) then
+          ann.modification := SCodeUtil.filterSubMods(ann.modification,
+            function SCodeUtil.filterGivenSubModNames(namesToKeep = filter));
+        end if;
+
         annotation_is_literal := SCodeUtil.onlyLiteralsInMod(ann.modification);
       then
         if SCodeUtil.isEmptyMod(ann.modification) then NONE() else SOME(SCode.Comment.COMMENT(SOME(ann), NONE()));
@@ -1172,15 +1183,16 @@ algorithm
   end if;
 
   json := dumpJSONCommentOpt(cmt, scope, json, failOnError = true);
-end dumpJSONInstanceIcon;
+end dumpJSONInstanceAnnotation;
 
-function dumpJSONInstanceIconExtends
+function dumpJSONInstanceAnnotationExtends
   input InstNode ext;
+  input list<String> filter;
   output JSON json = JSON.makeNull();
 algorithm
   json := JSON.addPair("$kind", JSON.makeString("extends"), json);
-  json := JSON.addPair("baseClass", dumpJSONInstanceIcon(ext), json);
-end dumpJSONInstanceIconExtends;
+  json := JSON.addPair("baseClass", dumpJSONInstanceAnnotation(ext, filter), json);
+end dumpJSONInstanceAnnotationExtends;
 
 function dumpJSONNodePath
   input InstNode node;
@@ -1910,7 +1922,7 @@ protected
   JSON j;
   InstContext.Type context;
 algorithm
-  (connections, transitions, initial_states) := sortEquations(sections);
+  (connections, transitions, initial_states) := sortEquations(Sections.equations(sections));
   context := InstContext.set(NFInstContext.CLASS, NFInstContext.RELAXED);
   transitions := list(Typing.typeEquation(e, context) for e in transitions);
   initial_states := list(Typing.typeEquation(e, context) for e in initial_states);
@@ -1926,47 +1938,56 @@ algorithm
 end dumpJSONEquations;
 
 function sortEquations
-  input Sections sections;
-  output list<Equation> connections = {};
-  output list<Equation> transitions = {};
-  output list<Equation> initialStates = {};
-  output list<Equation> others = {};
+  input list<Equation> equations;
+  input output list<Equation> connections = {};
+  input output list<Equation> transitions = {};
+  input output list<Equation> initialStates = {};
 algorithm
-  () := match sections
-    case Sections.SECTIONS()
-      algorithm
-        for eq in listReverse(sections.equations) loop
-          () := match eq
-            case Equation.CONNECT()
-              algorithm
-                connections := eq :: connections;
-              then
-                ();
+  for eq in listReverse(equations) loop
+    () := match eq
+      case Equation.CONNECT()
+        algorithm
+          connections := eq :: connections;
+        then
+          ();
 
-            case Equation.NORETCALL()
-              algorithm
-                if Expression.isCallNamed(eq.exp, "transition") then
-                  transitions := eq :: transitions;
-                elseif Expression.isCallNamed(eq.exp, "initialState") then
-                  initialStates := eq :: initialStates;
-                else
-                  others := eq :: others;
-                end if;
-              then
-                ();
+      case Equation.FOR()
+        algorithm
+          (connections, transitions, initialStates) :=
+            sortEquations(eq.body, connections, transitions, initialStates);
+        then
+          ();
 
-            else
-              algorithm
-                others := eq :: others;
-              then
-                ();
-          end match;
-        end for;
-      then
-        ();
+      case Equation.IF()
+        algorithm
+          for b in eq.branches loop
+            () := match b
+              case Equation.Branch.BRANCH()
+                algorithm
+                  (connections, transitions, initialStates) :=
+                    sortEquations(b.body, connections, transitions, initialStates);
+                then
+                  ();
 
-    else ();
-  end match;
+              else ();
+            end match;
+          end for;
+        then
+          ();
+
+      case Equation.NORETCALL()
+        algorithm
+          if Expression.isCallNamed(eq.exp, "transition") then
+            transitions := eq :: transitions;
+          elseif Expression.isCallNamed(eq.exp, "initialState") then
+            initialStates := eq :: initialStates;
+          end if;
+        then
+          ();
+
+      else ();
+    end match;
+  end for;
 end sortEquations;
 
 function dumpJSONConnections
@@ -2108,6 +2129,12 @@ algorithm
 
         if SCodeUtil.eachBool(mod.eachPrefix) then
           json := JSON.addPair("each", JSON.makeBoolean(true), json);
+        end if;
+
+        json := JSON.addPair("redeclare", JSON.makeBoolean(true), json);
+
+        if SCodeUtil.isElementReplaceable(mod.element) then
+          json := JSON.addPair("replaceable", JSON.makeBoolean(true), json);
         end if;
 
         binding_json := JSON.makeString(SCodeDump.unparseElementStr(mod.element));

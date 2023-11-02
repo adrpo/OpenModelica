@@ -40,6 +40,7 @@ encapsulated uniontype NFVariable
   import NFPrefixes.Variability;
   import NFPrefixes.ConnectorType;
   import NFPrefixes.Direction;
+  import NFPrefixes.AccessLevel;
   import Type = NFType;
   import BackendExtension = NFBackendExtension;
   import NFBackendExtension.BackendInfo;
@@ -79,6 +80,7 @@ public
     Attributes attr;
     Option<SCode.Comment> cmt;
     SourceInfo info;
+    BackendExtension.BackendInfo binfo = NFBackendExtension.DUMMY_BACKEND_INFO;
   algorithm
     node := ComponentRef.node(cref);
     comp := InstNode.component(node);
@@ -91,11 +93,11 @@ public
     // conversion to backend process (except for iterators). NBackendDAE.lower
     if ComponentRef.isIterator(cref) then
       binding := NFBinding.EMPTY_BINDING;
-      variable := VARIABLE(cref, ty, binding, vis, attr, {}, {}, cmt, info, BackendExtension.BACKEND_INFO(BackendExtension.ITERATOR(), NFBackendExtension.EMPTY_VAR_ATTR_REAL));
+      binfo.varKind := BackendExtension.ITERATOR();
     else
       binding := Component.getImplicitBinding(comp);
-      variable := VARIABLE(cref, ty, binding, vis, attr, {}, {}, cmt, info, NFBackendExtension.DUMMY_BACKEND_INFO);
     end if;
+    variable := VARIABLE(cref, ty, binding, vis, attr, {}, {}, cmt, info, binfo);
   end fromCref;
 
   function size
@@ -287,6 +289,30 @@ public
     input Variable variable;
     output Boolean isEncrypted = Util.endsWith(variable.info.fileName, ".moc");
   end isEncrypted;
+
+  function isAccessible
+    input Variable variable;
+    output Boolean isAccessible;
+  protected
+    Option<AccessLevel> oaccess;
+    AccessLevel access;
+  algorithm
+    oaccess := InstNode.getAccessLevel(ComponentRef.node(variable.name));
+
+    if isSome(oaccess) then
+      SOME(access) := oaccess;
+    else
+      access := if isEncrypted(variable) then AccessLevel.DOCUMENTATION else AccessLevel.PACKAGE_DUPLICATE;
+    end if;
+
+    if access < AccessLevel.ICON then
+      isAccessible := false;
+    elseif access < AccessLevel.NON_PACKAGE_TEXT then
+      isAccessible := not isProtected(variable);
+    else
+      isAccessible := true;
+    end if;
+  end isAccessible;
 
   function lookupTypeAttribute
     input String name;

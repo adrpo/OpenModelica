@@ -14063,17 +14063,17 @@ else
   // create empty model structure
   try
     // create empty derivatives dependencies
-    derivatives := list(SimCode.FMIUNKNOWN(getVariableIndex(v), {}, {})
+    derivatives := list(SimCode.FMIUNKNOWN(getVariableFMIIndex(v), {}, {})
                         for v in getScalarVars(inModelInfo.vars.derivativeVars));
 
     // create empty output dependencies
     varsA := List.filterOnTrue(inModelInfo.vars.algVars, isOutputSimVar);
-    outputs := list(SimCode.FMIUNKNOWN(getVariableIndex(v), {}, {})
+    outputs := list(SimCode.FMIUNKNOWN(getVariableFMIIndex(v), {}, {})
                     for v in getScalarVars(varsA));
 
     // create empty clockedStates dependencies
     clockedStates := List.filterOnTrue(inModelInfo.vars.algVars, isClockedStateSimVar);
-    discreteStates := list(SimCode.FMIUNKNOWN(getVariableIndex(v), {}, {})
+    discreteStates := list(SimCode.FMIUNKNOWN(getVariableFMIIndex(v), {}, {})
                            for v in getScalarVars(clockedStates));
 
     contPartSimDer := NONE();
@@ -14288,8 +14288,8 @@ algorithm
 
   // generate Partial derivative for initDAE here, as we have the list of all depVars and inDepVars
   if not Flags.isSet(Flags.FMI20_DEPENDENCIES) and not stringEq(Config.simCodeTarget(), "Cpp") then
-    fmiDerInitDepVars := getDependentAndIndepentVarsForJacobian(depCrefs, BackendVariable.listVar(depVars), crefSimVarHT);
-    fmiDerInitIndepVars := getDependentAndIndepentVarsForJacobian(indepCrefs, BackendVariable.listVar(indepVars), crefSimVarHT);
+    fmiDerInitDepVars := getDependentAndIndepentVarsForJacobian(depCrefs, BackendVariable.listVar(orderedVars), crefSimVarHT);
+    fmiDerInitIndepVars := getDependentAndIndepentVarsForJacobian(indepCrefs, BackendVariable.listVar(orderedVars), crefSimVarHT);
     if debug then
       BackendDump.dumpVarList(fmiDerInitDepVars, "fmiDerInit_unknownVars");
       BackendDump.dumpVarList(fmiDerInitIndepVars, "fmiDerInit_knownVars");
@@ -14319,12 +14319,18 @@ protected
   SimCodeVar.SimVar simVar;
 algorithm
   for cr in crefs loop
-    var := BackendVariable.getVarSingle(cr, orderedVars);
-    simVar := BaseHashTable.get(cr, crefSimVarHT);
-    // Filter only Real vars that match the --fmiFilter flag
-    if BackendVariable.isRealVar(var) and isSome(simVar.exportVar) then
-      outVar := var :: outVar;
-    end if;
+    // check if var exist otherwise don't generate derivatives for those vars, it is possible sometimes
+    // internal variables pops up in this list
+    try
+      var := BackendVariable.getVarSingle(cr, orderedVars);
+      simVar := BaseHashTable.get(cr, crefSimVarHT);
+      // Filter only Real vars that match the --fmiFilter flag
+      if BackendVariable.isRealVar(var) and isSome(simVar.exportVar) then
+        outVar := var :: outVar;
+      end if;
+    else
+      outVar := {};
+    end try;
   end for;
 end getDependentAndIndepentVarsForJacobian;
 

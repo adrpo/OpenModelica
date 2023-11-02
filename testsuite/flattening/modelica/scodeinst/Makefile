@@ -61,6 +61,9 @@ bindings7.mo \
 BooleanDim.mo \
 Break1.mo \
 Break2.mo \
+BreakModifier1.mo \
+BreakModifier2.mo \
+BreakModifier3.mo \
 BuiltinAttribute1.mo \
 BuiltinAttribute2.mo \
 BuiltinAttribute3.mo \
@@ -83,6 +86,7 @@ BuiltinAttribute19.mo \
 BuiltinAttribute20.mo \
 BuiltinAttribute21.mo \
 BuiltinAttribute22.mo \
+BuiltinAttribute23.mo \
 BuiltinLookup1.mo \
 BuiltinTime.mo \
 BuiltinTimeSubscripted.mo \
@@ -356,6 +360,7 @@ DimUnknown9.mo \
 DimUnknown10.mo \
 DimUnknown11.mo \
 DimUnknown12.mo \
+DimUnknown13.mo \
 dim1.mo \
 dim13.mo \
 dim16.mo \
@@ -731,9 +736,9 @@ ImplicitRangeEq2.mo \
 ImplicitRangeEq3.mo \
 ImplicitRangeExp1.mo \
 ImplicitRangeExp2.mo \
+ImplicitRangeExp3.mo \
 ImplicitRangeInvalid1.mo \
 ImplicitRangeInvalid2.mo \
-ImplicitRangeInvalid3.mo \
 ImplicitRangeType1.mo \
 ImplicitRangeType2.mo \
 ImportComponent1.mo \
@@ -1083,6 +1088,10 @@ SubscriptCevalIndexRange1.mo \
 SubscriptCevalSlice1.mo \
 SubscriptCevalSlice2.mo \
 SubscriptCevalWhole1.mo \
+SubscriptedExp1.mo \
+SubscriptedExp2.mo \
+SubscriptedExp3.mo \
+SubscriptedExp4.mo \
 SubscriptEnum1.mo \
 SubscriptIterator1.mo \
 SubscriptReduction1.mo \

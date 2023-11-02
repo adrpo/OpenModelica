@@ -514,9 +514,9 @@ algorithm
           exp := Expression.replaceIterator(exp, iter, e);
           exp := Expression.makeArray(ty, listArray({exp}));
           outExp := simplify(exp);
-        elseif Expression.isLiteral(e) and not Expression.hasNonArrayIteratorSubscript(exp, iter) then
+        elseif Expression.isLiteral(e) and isIteratorSubscriptedArray(exp, iter) then
           // If the iterator is only used to subscript array expressions like
-          // {{1, 2, 3}[i] in i 1:3}, then we might as well expand it.
+          // {{1, 2, 3}[i] for i in 1:3}, then we might as well expand it.
           (outExp, expanded) := ExpandExp.expandArrayConstructor(exp, ty, iters);
 
           if expanded then
@@ -536,6 +536,19 @@ algorithm
         Expression.CALL(Call.TYPED_ARRAY_CONSTRUCTOR(ty, var, pur, exp, iters));
   end matchcontinue;
 end simplifyArrayConstructor;
+
+function isIteratorSubscriptedArray
+  input Expression exp;
+  input InstNode iterator;
+  output Boolean res;
+algorithm
+  res := match exp
+    case Expression.SUBSCRIPTED_EXP()
+      then Expression.isArray(exp.exp) and
+           List.all(exp.subscripts, function Subscript.equalsIterator(iterator = iterator));
+    else false;
+  end match;
+end isIteratorSubscriptedArray;
 
 function simplifyReduction
   input Call call;
@@ -1317,6 +1330,61 @@ algorithm
   exp := combineBinariesExp(exp);
 end combineBinaries;
 
+public function splitMultary
+  "inverse functionality to combineBinaries.
+  returns a multary to its original binary representation."
+  input output Expression exp;
+algorithm
+  exp := match exp
+    local
+      Expression new_exp;
+      list<Expression> args, inv_args;
+      Operator inv_op;
+
+    case Expression.MULTARY() algorithm
+      if listLength(exp.arguments) > 0 then
+        // it has arguments, take the first one and start with it
+        new_exp :: args := exp.arguments;
+        inv_args    := exp.inv_arguments;
+      elseif listLength(exp.inv_arguments) > 0 then
+        // it has no arguments but inverse arguments
+        if Operator.getMathClassification(exp.operator) == NFOperator.MathClassification.ADDITION then
+          // take the first one out and negate it
+          new_exp :: inv_args := exp.inv_arguments;
+          args      := exp.arguments;
+          new_exp   := Expression.negate(new_exp);
+        else
+          // create an artificial 1 to devide by the inverse arguments
+          new_exp   := Expression.makeOne(Operator.typeOf(exp.operator));
+          args      := exp.arguments;
+          inv_args  := exp.inv_arguments;
+        end if;
+      else
+        // empty, make either 0 or 1 depending on math classification
+        if Operator.getMathClassification(exp.operator) == NFOperator.MathClassification.ADDITION then
+          new_exp   := Expression.makeZero(Operator.typeOf(exp.operator));
+        else
+          new_exp   := Expression.makeOne(Operator.typeOf(exp.operator));
+        end if;
+        args        := exp.arguments;
+        inv_args    := exp.inv_arguments;
+      end if;
+
+      inv_op := Operator.invert(exp.operator);
+      // chain all arguments
+      for arg in args loop
+        new_exp := Expression.BINARY(new_exp, exp.operator, arg);
+      end for;
+      // chain all inverse arguments
+      for arg in inv_args loop
+        new_exp := Expression.BINARY(new_exp, inv_op, arg);
+      end for;
+    then new_exp;
+
+    else exp;
+  end match;
+end splitMultary;
+
 protected function combineBinariesExp
   "author: kabdelhak 09-2020
   Combines binaries for better handling in the backend.
@@ -1421,9 +1489,11 @@ algorithm
     then addArgument(result, exp, inverse);
 
     case (_, Expression.ARRAY()) algorithm
-      exp.elements := Array.map(exp.elements,
-        function combineBinariesExp(optOperator = NONE(),
-          result = Expression.EMPTY(Expression.typeOf(exp)), inverse = false));
+      if not exp.literal then
+        exp.elements := Array.map(exp.elements,
+          function combineBinariesExp(optOperator = NONE(),
+            result = Expression.EMPTY(Expression.typeOf(exp)), inverse = false));
+      end if;
     then addArgument(result, exp, inverse);
 
     case (_, Expression.RANGE()) algorithm

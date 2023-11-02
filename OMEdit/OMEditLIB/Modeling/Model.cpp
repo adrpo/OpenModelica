@@ -498,6 +498,8 @@ namespace ModelInstance
     : mPlacementAnnotation(pParentModel)
   {
     mpParentModel = pParentModel;
+    mpIconAnnotation = std::make_unique<IconDiagramAnnotation>(mpParentModel);
+    mpDiagramAnnotation = std::make_unique<IconDiagramAnnotation>(mpParentModel);
     mDocumentationClass = false;
     mVersion = "";
     mVersionDate = "";
@@ -514,12 +516,10 @@ namespace ModelInstance
   void Annotation::deserialize(const QJsonObject &jsonObject)
   {
     if (jsonObject.contains("Icon")) {
-      mpIconAnnotation = std::make_unique<IconDiagramAnnotation>(mpParentModel);
       mpIconAnnotation->deserialize(jsonObject.value("Icon").toObject());
     }
 
     if (jsonObject.contains("Diagram")) {
-      mpDiagramAnnotation = std::make_unique<IconDiagramAnnotation>(mpParentModel);
       mpDiagramAnnotation->deserialize(jsonObject.value("Diagram").toObject());
     }
 
@@ -602,18 +602,6 @@ namespace ModelInstance
       mDiagramMap.deserialize(jsonObject.value("DiagramMap").toObject());
     }
   }
-
-  IconDiagramAnnotation *Annotation::getIconAnnotation() const
-  {
-    return mpIconAnnotation ? mpIconAnnotation.get() : &IconDiagramAnnotation::defaultIconDiagramAnnotation;
-  }
-
-  IconDiagramAnnotation *Annotation::getDiagramAnnotation() const
-  {
-    return mpDiagramAnnotation ? mpDiagramAnnotation.get() : &IconDiagramAnnotation::defaultIconDiagramAnnotation;
-  }
-
-  IconDiagramAnnotation IconDiagramAnnotation::defaultIconDiagramAnnotation{nullptr};
 
   IconDiagramAnnotation::IconDiagramAnnotation(Model *pParentModel)
   {
@@ -700,11 +688,7 @@ namespace ModelInstance
 
   Modifier::Modifier()
   {
-    mName = "";
-    mValue = "";
-    mFinal = false;
-    mEach = false;
-    mModifiers.clear();
+
   }
 
   void Modifier::deserialize(const QJsonValue &jsonValue)
@@ -720,6 +704,10 @@ namespace ModelInstance
           mFinal = true;
         } else if (modifierKey.compare(QStringLiteral("each")) == 0) {
           mEach = true;
+        } else if (modifierKey.compare(QStringLiteral("redeclare")) == 0) {
+          mRedeclare = true;
+        } else if (modifierKey.compare(QStringLiteral("replaceable")) == 0) {
+          mReplaceable = true;
         } else {
           Modifier modifier;
           modifier.setName(modifierKey);
@@ -732,41 +720,50 @@ namespace ModelInstance
     }
   }
 
-  QString Modifier::getValueWithSubModifiers() const
+  QString Modifier::toString() const
   {
-    if (mModifiers.isEmpty()) {
+    if (isRedeclare()) {
       return mValue;
     } else {
-      QStringList modifiers;
+      QString value;
+      value.append(printRedeclare());
+      value.append(printEach());
+      value.append(printFinal());
+      value.append(printReplaceable());
+      value.append(mName);
+      QStringList subModifiers;
       foreach (auto subModifier, mModifiers) {
-        if (subModifier.getModifiers().isEmpty()) {
-          modifiers.append(subModifier.getName() % "=" % subModifier.getValue());
-        } else {
-          modifiers.append(subModifier.getName() % subModifier.getValueWithSubModifiers());
-        }
+        subModifiers.append(subModifier.toString());
       }
-      return "(" % modifiers.join(",") % ")";
+      if (!subModifiers.isEmpty()) {
+        value.append("(" % subModifiers.join(", ") % ")");
+      }
+      if (mValue.isEmpty()) {
+        return value;
+      } else {
+        return value.append(mName.isEmpty() ? mValue : " = " % mValue);
+      }
     }
   }
 
-  QString Modifier::getModifier(const QString &m) const
+  Modifier Modifier::getModifier(const QString &m) const
   {
-    foreach (auto modifier, mModifiers) {
+    foreach (Modifier modifier, mModifiers) {
       if (modifier.getName().compare(m) == 0) {
-        return modifier.getValue();
+        return modifier;
       }
     }
-    return "";
+    return Modifier();
+  }
+
+  QString Modifier::getModifierValue(const QString &m) const
+  {
+    return getModifier(m).getValue();
   }
 
   bool Modifier::hasModifier(const QString &m) const
   {
-    foreach (auto modifier, mModifiers) {
-      if (modifier.getName().compare(m) == 0) {
-        return true;
-      }
-    }
-    return false;
+    return getModifier(m).getName().compare(m) == 0;
   }
 
   QString Modifier::getModifierValue(QStringList qualifiedModifierName) const
@@ -797,6 +794,26 @@ namespace ModelInstance
     }
 
     return "";
+  }
+
+  QString Modifier::printEach() const
+  {
+    return isEach() ? "each " : "";
+  }
+
+  QString Modifier::printFinal() const
+  {
+    return isFinal() ? "final " : "";
+  }
+
+  QString Modifier::printRedeclare() const
+  {
+    return isRedeclare() ? "redeclare " : "";
+  }
+
+  QString Modifier::printReplaceable() const
+  {
+    return isReplaceable() ? "replaceable " : "";
   }
 
   Replaceable::Replaceable(Model *pParentModel)
@@ -995,7 +1012,6 @@ namespace ModelInstance
     }
 
     if (mModelJson.contains("annotation")) {
-      mpAnnotation = std::make_unique<Annotation>(this);
       mpAnnotation->deserialize(mModelJson.value("annotation").toObject());
     }
 
@@ -1233,6 +1249,22 @@ namespace ModelInstance
     return elem && elem->getModel() && elem->getModel()->isConnector();
   }
 
+  bool isCompatibleConnectorDirection(const Element &lhs, bool lhsOutside, const Element &rhs, bool rhsOutside)
+  {
+    // A inside output should not be connected to an inside output,
+    // or a public outside input to a public outside input.
+    auto dir = lhs.getDirection();
+    if (!dir.isEmpty() && dir == rhs.getDirection()) {
+      if (dir == "output" && !lhsOutside && !rhsOutside) {
+        return false;
+      } else if (dir == "input" && lhsOutside && rhsOutside && lhs.isPublic() && rhs.isPublic()) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   bool Model::isValidConnection(const Name &lhsConnector, const Name &rhsConnector) const
   {
     const Element *lhs = lookupElement(lhsConnector);
@@ -1243,18 +1275,11 @@ namespace ModelInstance
       return true;
     }
 
-    // A inside output should not be connected to an inside output,
-    // or a public outside input to a public outside input.
-    auto dir = lhs->getDirection();
-    if (!dir.isEmpty() && dir == rhs->getDirection()) {
-      auto lhs_outside = isOutsideConnector(lhsConnector, *this);
-      auto rhs_outside = isOutsideConnector(rhsConnector, *this);
+    auto lhs_outside = isOutsideConnector(lhsConnector, *this);
+    auto rhs_outside = isOutsideConnector(rhsConnector, *this);
 
-      if (dir == "output" && !lhs_outside && !rhs_outside) {
-        return false;
-      } else if (dir == "input" && lhs_outside && rhs_outside && lhs->isPublic() && rhs->isPublic()) {
-        return false;
-      }
+    if (!isCompatibleConnectorDirection(*lhs, lhs_outside, *rhs, rhs_outside)) {
+      return false;
     }
 
     // Check that the connectors are type compatible.
@@ -1263,10 +1288,10 @@ namespace ModelInstance
 
     if (!lhs_model || !rhs_model) return false;
 
-    return lhs_model->isTypeCompatibleWith(*rhs_model);
+    return lhs_model->isTypeCompatibleWith(*rhs_model, lhs_outside, rhs_outside);
   }
 
-  bool Model::isTypeCompatibleWith(const Model &other) const
+  bool Model::isTypeCompatibleWith(const Model &other, bool lhsOutside, bool rhsOutside) const
   {
     if (isExpandableConnector() || other.isExpandableConnector()) {
       // Don't type check expandable connectors, since we don't really know what
@@ -1294,13 +1319,11 @@ namespace ModelInstance
               auto m1 = e1->getModel();
               auto m2 = e2->getModel();
 
-              if (m1 && m2 && !m1->isTypeCompatibleWith(*m2)) {
+              if (m1 && m2 && !m1->isTypeCompatibleWith(*m2, lhsOutside, rhsOutside)) {
                 return false;
               }
 
-              // The components should not have the same input/output prefix.
-              auto dir = e1->getDirection();
-              if (!dir.isEmpty() && dir == e2->getDirection()) {
+              if (!isCompatibleConnectorDirection(*e1, lhsOutside, *e2, rhsOutside)) {
                 return false;
               }
             } else {
@@ -1324,7 +1347,7 @@ namespace ModelInstance
         auto m1 = comps1.at(i)->getModel();
         auto m2 = comps2.at(i)->getModel();
 
-        if (m1 && m2 && !m1->isTypeCompatibleWith(*m2)) {
+        if (m1 && m2 && !m1->isTypeCompatibleWith(*m2, lhsOutside, rhsOutside)) {
           return false;
         }
       }
@@ -1442,6 +1465,7 @@ namespace ModelInstance
     mConnections.clear();
     mTransitions.clear();
     mInitialStates.clear();
+    mpAnnotation = std::make_unique<Annotation>(this);
   }
 
   Transformation::Transformation()
@@ -1638,11 +1662,6 @@ namespace ModelInstance
       mComment = jsonObject.value("comment").toString();
     }
 
-    if (jsonObject.contains("annotation")) {
-      mpAnnotation = std::make_unique<Annotation>(mpParentModel);
-      mpAnnotation->deserialize(jsonObject.value("annotation").toObject());
-    }
-
     deserialize_impl(jsonObject);
   }
 
@@ -1807,6 +1826,12 @@ namespace ModelInstance
         mBaseClass = mpModel->getName();
       }
     }
+
+    // Always create Annotation for extend element. See #11363
+    mpAnnotation = std::make_unique<Annotation>(mpParentModel);
+    if (jsonObject.contains("annotation")) {
+      mpAnnotation->deserialize(jsonObject.value("annotation").toObject());
+    }
   }
 
   /*!
@@ -1892,6 +1917,11 @@ namespace ModelInstance
       mpPrefixes = std::make_unique<Prefixes>(mpParentModel);
       mpPrefixes->deserialize(jsonObject.value("prefixes").toObject());
     }
+
+    if (jsonObject.contains("annotation")) {
+      mpAnnotation = std::make_unique<Annotation>(mpParentModel);
+      mpAnnotation->deserialize(jsonObject.value("annotation").toObject());
+    }
   }
 
   /*!
@@ -1949,6 +1979,11 @@ namespace ModelInstance
 
     if (jsonObject.contains("source")) {
       mSource.deserialize(jsonObject.value("source").toObject());
+    }
+
+    if (jsonObject.contains("annotation")) {
+      mpAnnotation = std::make_unique<Annotation>(mpParentModel);
+      mpAnnotation->deserialize(jsonObject.value("annotation").toObject());
     }
   }
 
