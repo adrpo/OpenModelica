@@ -345,11 +345,16 @@ private:
   QAction *mpNewCompositeModelFileAction;
   QAction *mpOpenCompositeModelFileAction;
   QAction *mpLoadExternModelAction;
+  // CRML File Actions
+  QAction *mpNewCRMLFileAction;
+  QAction *mpOpenCRMLFileAction;
+  // Directory actions
   QAction *mpOpenDirectoryAction;
   QAction *mpSaveAction;
   QAction *mpSaveAsAction;
   QAction *mpSaveAllAction;
   QAction *mpSaveTotalAction;
+  // FMU
   QAction *mpImportFMUAction;
   QAction *mpImportFMUModelDescriptionAction;
   QAction *mpImportFromOMNotebookAction;
@@ -400,6 +405,8 @@ private:
   QAction *mpArchivedSimulationsAction;
   // Data reconciliation action
   QAction *mpCalculateDataReconciliationAction;
+  // CRML run testsuite action
+  QAction *mpRunCRMLTestsuiteAction;
   // Debug Menu
   QAction *mpDebugConfigurationsAction;
   QAction *mpAttachDebuggerToRunningProcessAction;
@@ -515,6 +522,8 @@ public slots:
   void createNewCompositeModelFile();
   void openCompositeModelFile();
   void loadExternalModels();
+  void createNewCRMLFile();
+  void openCRMLFile();
   void openDirectory();
   void writeOutputFileData(QString data);
   void writeErrorFileData(QString data);
@@ -607,6 +616,7 @@ private slots:
   void messageTabClosed(int index);
   void autoSave();
   void showDataReconciliationDialog();
+  void showRunCRMLTestsuiteDialog();
   void showDebugConfigurationsDialog();
   void showAttachToProcessDialog();
   void createGitRepository();
