@@ -459,8 +459,6 @@ QIcon LibraryTreeItem::getLibraryTreeItemIcon() const
 {
   if (mLibraryType == LibraryTreeItem::CompositeModel) {
     return ResourceCache::getIcon(":/Resources/icons/tlm-icon.svg");
-  } else if (mLibraryType == LibraryTreeItem::CRML) {
-    return ResourceCache::getIcon(":/Resources/icons/crml-icon.svg");
   } else if (mLibraryType == LibraryTreeItem::OMS) {
     if (isTopLevel()) {
       return ResourceCache::getIcon(":/Resources/icons/model-icon.svg");
@@ -561,6 +559,11 @@ QIcon LibraryTreeItem::getLibraryTreeItemIcon() const
       default:
         return ResourceCache::getIcon(":/Resources/icons/type-icon.svg");
     }
+  } else if (mLibraryType == LibraryTreeItem::Text) {
+    if (isCRMLFile())
+      return ResourceCache::getIcon(":/Resources/icons/crml-icon.svg");
+    else
+      return QIcon();
   }
   return QIcon();
 }
@@ -3609,21 +3612,6 @@ void LibraryTreeView::showContextMenu(QPoint point)
             menu.addAction(mpGenerateVerificationScenariosAction);
           }
           break;
-        case LibraryTreeItem::CRML:
-          if (fileInfo.isDir()) {
-            menu.addAction(mpNewFileAction);
-            menu.addAction(mpNewFolderAction);
-            menu.addSeparator();
-          }
-          menu.addAction(mpCopyPathAction);
-          menu.addSeparator();
-          menu.addAction(mpRenameAction);
-          menu.addAction(mpDeleteAction);
-          if (pLibraryTreeItem->isTopLevel()) {
-            menu.addSeparator();
-            menu.addAction(mpUnloadCRMLFileAction);
-          }
-          break;
         case LibraryTreeItem::Text:
           if (fileInfo.isDir()) {
             menu.addAction(mpNewFileAction);
@@ -3636,7 +3624,11 @@ void LibraryTreeView::showContextMenu(QPoint point)
           menu.addAction(mpDeleteAction);
           if (pLibraryTreeItem->isTopLevel()) {
             menu.addSeparator();
-            menu.addAction(mpUnloadCompositeModelFileAction);
+            if (pLibraryTreeItem->isCRMLFile()) {
+              menu.addAction(mpUnloadCRMLFileAction);
+            } else {
+              menu.addAction(mpUnloadCompositeModelFileAction);
+            }
           }
           break;
         case LibraryTreeItem::CompositeModel:
@@ -4695,7 +4687,7 @@ void LibraryWidget::openCRMLFile(QFileInfo fileInfo, QString encoding, bool show
   LibraryTreeItem *pLibraryTreeItem = 0;
   QString compositeModelName;
   if (fileInfo.suffix().compare("crml") == 0) {
-    pLibraryTreeItem = mpLibraryTreeModel->createLibraryTreeItem(LibraryTreeItem::CRML, fileInfo.fileName(), fileInfo.absoluteFilePath(),
+    pLibraryTreeItem = mpLibraryTreeModel->createLibraryTreeItem(LibraryTreeItem::Text, fileInfo.fileName(), fileInfo.absoluteFilePath(),
                                                                  fileInfo.absoluteFilePath(), true,
                                                                  mpLibraryTreeModel->getRootLibraryTreeItem());
   }
