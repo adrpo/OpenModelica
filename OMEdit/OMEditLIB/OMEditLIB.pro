@@ -189,6 +189,7 @@ SOURCES += Util/Helper.cpp \
   CRML/CRMLFile.cpp \
   CRML/CRMLProxy.cpp \
   CRML/CRMLModelDialog.cpp \
+  CRML/CRMLTranslateAsDialog.cpp \
   CRML/CRMLTranslatorOutputWidget.cpp \
   MOS/MOSFile.cpp \
   MOS/MOSProxy.cpp \
@@ -318,6 +319,7 @@ HEADERS  += Util/Helper.h \
   CRML/CRMLFile.h \
   CRML/CRMLProxy.h \
   CRML/CRMLModelDialog.h \
+  CRML/CRMLTranslateAsDialog.h \
   CRML/CRMLTranslatorOptions.h \
   CRML/CRMLTranslatorOutputWidget.h \
   MOS/MOSFile.h \
