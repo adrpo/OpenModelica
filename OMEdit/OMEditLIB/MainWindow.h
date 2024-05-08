@@ -95,6 +95,7 @@ class StatusBar;
 class TraceabilityGraphViewWidget;
 class SearchWidget;
 class MessageTab;
+class CRMLTranslateAsDialog;
 
 class MainWindow : public QMainWindow
 {
@@ -324,6 +325,7 @@ private:
   QObject *mpOMSensPlugin;
   GitCommands *mpGitCommands;
   CommitChangesDialog *mpCommitChangesDialog;
+  CRMLTranslateAsDialog* mpCRMLTranslateAsDialog;
   TraceabilityInformationURI *mpTraceabilityInformationURI;
   QStackedWidget *mpCentralStackedWidget;
   QTabWidget *mpMessagesTabWidget;
@@ -614,6 +616,7 @@ public slots:
   void toggleAutoSave();
   void readInterfaceData(LibraryTreeItem *pLibraryTreeItem);
   void enableReSimulationToolbar(bool visible);
+  void runCRMLTranslateAs(int result);
 private slots:
   void perspectiveTabChanged(int tabIndex);
   void documentationDockWidgetVisibilityChanged(bool visible);
