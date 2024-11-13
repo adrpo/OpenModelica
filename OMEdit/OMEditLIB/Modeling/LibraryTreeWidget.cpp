@@ -3528,7 +3528,7 @@ void LibraryTreeView::libraryTreeItemDoubleClicked(const QModelIndex &index)
       } else {
         mpLibraryWidget->getLibraryTreeModel()->showModelWidget(pLibraryTreeItem);
       }
-    } else if (pLibraryTreeItem->isCRML()) {
+    } else if (pLibraryTreeItem->isCRMLFile()) {
       mpLibraryWidget->getLibraryTreeModel()->showModelWidget(pLibraryTreeItem);
     } else if (pLibraryTreeItem->isSSP()) {
       if ((pLibraryTreeItem->getOMSConnector() || pLibraryTreeItem->getOMSBusConnector() || pLibraryTreeItem->getOMSTLMBusConnector())) {

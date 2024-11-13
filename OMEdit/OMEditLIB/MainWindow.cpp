@@ -614,7 +614,7 @@ void MainWindow::showModelingPerspectiveToolBars(ModelWidget *pModelWidget)
     SHOW_HIDE_TOOLBAR(mpDebuggerToolBar, ToolBars::debuggerToolBar, false);
     SHOW_HIDE_TOOLBAR(mpTLMSimulationToolbar, ToolBars::TLMSimulationToolBar, false);
     SHOW_HIDE_TOOLBAR(mpOMSimulatorToolbar, ToolBars::OMSimulatorToolBar, false);
-  } else if (pModelWidget && pModelWidget->getLibraryTreeItem()->isCRML()) {
+  } else if (pModelWidget && pModelWidget->getLibraryTreeItem()->isCRMLFile()) {
     pSettings->beginGroup(ToolBars::modelingTextPerspective);
     SHOW_HIDE_TOOLBAR(mpEditToolBar, ToolBars::editToolBar, true);
     SHOW_HIDE_TOOLBAR(mpViewToolBar, ToolBars::viewToolBar, true);

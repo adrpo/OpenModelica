@@ -88,7 +88,6 @@ public:
   bool isModelica() const {return mLibraryType == LibraryTreeItem::Modelica;}
   bool isText() const {return mLibraryType == LibraryTreeItem::Text;}
   bool isCompositeModel() const {return mLibraryType == LibraryTreeItem::CompositeModel;}
-  bool isCRML() const {return mLibraryType == LibraryTreeItem::CRML;}
   bool isSSP() const {return mLibraryType == LibraryTreeItem::OMS;}
   void setSystemLibrary(bool systemLibrary) {mSystemLibrary = systemLibrary;}
   bool isSystemLibrary() {return mSystemLibrary;}
@@ -515,7 +514,7 @@ public:
   LibraryTreeView* getLibraryTreeView() {return mpLibraryTreeView;}
   void openFile(QString fileName, QString encoding = Helper::utf8, bool showProgress = true, bool checkFileExists = false, bool loadExternalModel = false);
   void openModelicaFile(QString fileName, QString encoding = Helper::utf8, bool showProgress = true, bool secondAttempt = false, int row = -1);
-  void openEncrytpedModelicaLibrary(QString fileName, QString encoding = Helper::utf8, bool showProgress = true);
+  void openEncryptedModelicaLibrary(QString fileName, QString encoding = Helper::utf8, bool showProgress = true);
   void openCRMLFile(QFileInfo fileInfo, QString encoding = Helper::utf8, bool showProgress = true);
   void openMOSFile(QFileInfo fileInfo, QString encoding = Helper::utf8, bool showProgress = true);
   void openCompositeModelOrTextFile(QFileInfo fileInfo, bool showProgress = true);
