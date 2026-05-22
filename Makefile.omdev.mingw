@@ -3,12 +3,7 @@ PREVIOUS_GCC_VERSION = "5.3.0"
 GCC_VERSION := "`gcc -dumpversion`"
 OLD_OMDEV := $(shell expr "$(GCC_VERSION)" "==" "$(PREVIOUS_GCC_VERSION)")
 
-ifeq ($(OM_QT_MAJOR_VERSION),6)
-	QT5_EXTRA_DLLS = Qt6WebEngineCore.dll Qt6WebEngineWidgets.dll Qt6Positioning.dll Qt6Qml.dll Qt6Quick.dll Qt6QmlMeta.dll Qt6QmlWorkerScript.dll Qt6QmlModels.dll Qt6WebChannel.dll Qt6QuickWidgets.dll Qt6Widgets.dll Qt6Xml.dll libharfbuzz-subset-0.dll liblcms2-2.dll libminizip-1.dll libopenjp2-7.dll libopus-0.dll libsnappy.dll libdeflate.dll libjbig-0.dll libLerc.dll libwebpdemux-2.dll libwebpmux-3.dll libngtcp2-16.dll libngtcp2_crypto_ossl-0.dll libtiff*.dll
-else
-	OM_QT_MAJOR_VERSION = 5
-	QT5_EXTRA_DLLS = Qt5QmlModels.dll
-endif
+QT_EXTRA_DLLS =
 
 ifeq "$(OLD_OMDEV)" "1"
 	IS_NEW_OMDEV = false
@@ -19,8 +14,7 @@ else # new OMDev, use clang
 	IS_NEW_OMDEV = true
 	CC = clang
 	CXX = clang++
-	QT_EXTRA_DLLS=libdouble-conversion.dll libzstd.dll libwoff2dec.dll libwoff2common.dll $(QT5_EXTRA_DLLS) libnghttp2-14.dll \
-	              libgraphite2.dll libbrotlidec.dll libbrotlicommon.dll libfontconfig-1.dll
+	QT_EXTRA_DLLS=libdouble-conversion.dll libzstd.dll libwoff2dec.dll libwoff2common.dll Qt6WebEngineCore.dll Qt6WebEngineWidgets.dll Qt6Positioning.dll Qt6Qml.dll Qt6Quick.dll Qt6QmlMeta.dll Qt6QmlWorkerScript.dll Qt6QmlModels.dll Qt6WebChannel.dll Qt6QuickWidgets.dll Qt6Widgets.dll Qt6Xml.dll libharfbuzz-subset-0.dll liblcms2-2.dll libminizip-1.dll libopenjp2-7.dll libopus-0.dll libsnappy.dll libdeflate.dll libjbig-0.dll libLerc.dll libwebpdemux-2.dll libwebpmux-3.dll libngtcp2-16.dll libngtcp2_crypto_ossl-0.dll libtiff*.dll libnghttp2-14.dll libgraphite2.dll libbrotlidec.dll libbrotlicommon.dll libfontconfig-1.dll
 endif
 
 # CFLAGS=-g -O2
