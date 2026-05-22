@@ -45,6 +45,14 @@ if(OM_OMEDIT_INSTALL_RUNTIME_DLLS AND MINGW)
   message(STATUS "Installing QT${OM_QT_MAJOR_VERSION} translation from ${MSYSTEM_PREFIX_ESCAPED}/share/qt${OM_QT_MAJOR_VERSION}/translations/")
   install(DIRECTORY ${MSYSTEM_PREFIX_ESCAPED}/share/qt${OM_QT_MAJOR_VERSION}/translations/    # Note the slash at the end!
           DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/share/qt${OM_QT_MAJOR_VERSION}/translations)
+  # Install the Qt5/Qt6 resources directories
+  message(STATUS "Installing QT${OM_QT_MAJOR_VERSION} translation from ${MSYSTEM_PREFIX_ESCAPED}/share/qt${OM_QT_MAJOR_VERSION}/resources/")
+  install(DIRECTORY ${MSYSTEM_PREFIX_ESCAPED}/share/qt${OM_QT_MAJOR_VERSION}/resources/    # Note the slash at the end!
+          DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/share/qt${OM_QT_MAJOR_VERSION}/resources)
+  # Install the Qt share/qtX/bin directory
+  message(STATUS "Installing QT${OM_QT_MAJOR_VERSION} translation from ${MSYSTEM_PREFIX_ESCAPED}/share/qt${OM_QT_MAJOR_VERSION}/bin/")
+  install(DIRECTORY ${MSYSTEM_PREFIX_ESCAPED}/share/qt${OM_QT_MAJOR_VERSION}/bin/    # Note the slash at the end!
+          DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/share/qt${OM_QT_MAJOR_VERSION}/bin)
 
   # TODO: This is stupid, but I can't get install with RUNTIME_DEPENDENCIES to run.
   # It needs to link to libs that are installed to ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR},
