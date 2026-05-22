@@ -3,6 +3,8 @@ PREVIOUS_GCC_VERSION = "5.3.0"
 GCC_VERSION := "`gcc -dumpversion`"
 OLD_OMDEV := $(shell expr "$(GCC_VERSION)" "==" "$(PREVIOUS_GCC_VERSION)")
 
+# make qt6 the default on Windows
+OM_QT_MAJOR_VERSION=6
 QT_EXTRA_DLLS =
 
 ifeq "$(OLD_OMDEV)" "1"
