@@ -40,6 +40,10 @@ include(cmake/omc_git_revision.cmake)
 # well as linux. See the file for more info.
 include(cmake/OMCPThreads.cmake)
 
+if (MINGW)
+SET(IS_MINGW64 ON)
+endif(MINGW)
+
 omc_add_to_report(CMAKE_VERSION)
 # Add the compiler ids to the report for convenience.
 omc_add_to_report(CMAKE_C_COMPILER_ID)

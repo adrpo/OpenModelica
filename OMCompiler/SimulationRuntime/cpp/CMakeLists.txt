@@ -34,7 +34,7 @@
 # The used defines are stored in the SYSTEM_CFLAGS variable, which is passed to the ModelicaConfig.inc and written in the PrecompiledHeader.cmake
 
 if(OPENMODELICA_NEW_CMAKE_BUILD)
-  include(cmake_3.14.cmake)
+include(cmake_3.14.cmake)
 else(OPENMODELICA_NEW_CMAKE_BUILD)
 
 cmake_minimum_required(VERSION 3.5)
