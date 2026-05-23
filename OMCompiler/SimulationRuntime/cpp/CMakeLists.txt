@@ -475,9 +475,17 @@ ELSEIF(NOT FMU_TARGET)
 ENDIF(NOT(COMPILER_SUPPORTS_CXX11))
 
 IF(NOT FMU_TARGET)
+if(CMAKE_VERSION VERSION_LESS "3.30.0")
   FIND_PACKAGE(Boost REQUIRED COMPONENTS filesystem serialization program_options)
+else()
+  FIND_PACKAGE(Boost CONFIG COMPONENTS filesystem serialization program_options REQUIRED)
+endif()
 ELSE(NOT FMU_TARGET)
+if(CMAKE_VERSION VERSION_LESS "3.30.0")
   FIND_PACKAGE(Boost COMPONENTS filesystem serialization program_options)
+else()
+  FIND_PACKAGE(Boost CONFIG COMPONENTS filesystem serialization program_options)
+endif()
 ENDIF(NOT FMU_TARGET)
 
 # Use old C++ ABI for cross compilation of FMUs

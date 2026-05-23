@@ -19,11 +19,7 @@ set(Boost_INCLUDE_ ".")
 # This is supposwed to signify the directory where the boost libraries can be found (for -L ...)
 set(Boost_LIBS_ ".")
 # The actual boost libraries needed to be linked.
-if (WIN32)
 set(Boost_LIBRARIES_ ${Boost_LIBRARIES})
-else()
-set(Boost_LIBRARIES_ "-lboost_program_options -lboost_filesystem")
-endif()
 
 # Lapack libs are also expected to be in the system directories.
 set(LAPACK_LIBS_ ".")

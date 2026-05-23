@@ -33,7 +33,7 @@
 #
 # The used defines are stored in the SYSTEM_CFLAGS variable, which is passed to the ModelicaConfig.inc and written in the PrecompiledHeader.cmake
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5..4.3)
 
 # OMSICPP_SOURCE_DIR is used by sub-CMakeLists.txt to reference paths relative
 # to the OMSICpp directory. In standalone mode it equals CMAKE_SOURCE_DIR; in
@@ -492,11 +492,19 @@ elseif(NOT FMU_TARGET)
   message(STATUS "Boost thread disabled because of available C++11 support")
 endif(NOT(COMPILER_SUPPORTS_CXX11))
 
-if(NOT FMU_TARGET)
-  find_package(Boost REQUIRED COMPONENTS filesystem serialization program_options)
-else(NOT FMU_TARGET)
-  find_package(Boost COMPONENTS filesystem serialization program_options)
-endif(NOT FMU_TARGET)
+IF(NOT FMU_TARGET)
+if(CMAKE_VERSION VERSION_LESS "3.30.0")
+  FIND_PACKAGE(Boost REQUIRED COMPONENTS filesystem serialization program_options)
+else()
+  FIND_PACKAGE(Boost CONFIG COMPONENTS filesystem serialization program_options REQUIRED)
+endif()
+ELSE(NOT FMU_TARGET)
+if(CMAKE_VERSION VERSION_LESS "3.30.0")
+  FIND_PACKAGE(Boost COMPONENTS filesystem serialization program_options)
+else()
+  FIND_PACKAGE(Boost CONFIG COMPONENTS filesystem serialization program_options)
+endif()
+ENDIF(NOT FMU_TARGET)
 
 # Use old C++ ABI for cross compilation of FMUs
 # because libstdc++ might not be upgraded yet
