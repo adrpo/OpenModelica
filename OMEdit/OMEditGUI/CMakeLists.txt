@@ -67,7 +67,7 @@ if(OM_OMEDIT_INSTALL_RUNTIME_DLLS AND MINGW)
 
   # TODO: OMPlot should add this? Or OMEdit needs to link to it directly?
   install(FILES
-          ${MSYSTEM_PREFIX_ESCAPED}/bin/Qt5OpenGL.dll
+          ${MSYSTEM_PREFIX_ESCAPED}/bin/Qt6OpenGL.dll
           TYPE BIN)
 
   message(STATUS "Looking for runtime dependencies of OMEdit in ${MSYSTEM_PREFIX_ESCAPED}/bin ${RUNTIME_LIB_DIRS}")
