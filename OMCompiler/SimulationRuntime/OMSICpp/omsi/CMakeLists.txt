@@ -56,6 +56,8 @@ if(BUILD_SHARED_LIBS)
     endif()
     string(REPLACE "\\" "/" MSYSTEM_PREFIX_ESCAPED "$ENV{MSYSTEM_PREFIX}")
 
+    cmake_policy(SET CMP0207 NEW)
+
     install(TARGETS ${OSUSimName}
             RUNTIME_DEPENDENCIES
               DIRECTORIES ${MSYSTEM_PREFIX_ESCAPED}/bin

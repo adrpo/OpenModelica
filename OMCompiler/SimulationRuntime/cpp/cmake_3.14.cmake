@@ -41,7 +41,7 @@ target_include_directories(OMCppConfig INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/Inc
 # (note that they all link to 'OMCppConfig' a.k.a 'omc::simrt::cpp::config')
 target_link_libraries(OMCppConfig INTERFACE Boost::boost)
 
-function(get_linker_flag_from_boost_target TARGET OUT_VAR)
+function(get_linker_flag_from_library_target TARGET OUT_VAR)
     # Get the actual library file path
     get_target_property(lib_location ${TARGET} IMPORTED_LOCATION)
 
@@ -59,7 +59,7 @@ function(get_linker_flag_from_boost_target TARGET OUT_VAR)
 
         # Strip off prefix and suffix to get the library name
         # Handle Unix libraries (libfoo.so, libfoo.a)
-        if(lib_name MATCHES "^lib(.+)\\.(a|so|dylib|dll|lib)$")
+        if(lib_name MATCHES "^lib(.+)\\.(a|so\\.?[0-9.]*|dylib\\.?[0-9.]*|dll|lib)$")
             set(lib_base ${CMAKE_MATCH_1})
         # Handle Windows libraries (foo.lib)
         elseif(lib_name MATCHES "^(.+)\\.lib$")
@@ -76,9 +76,9 @@ function(get_linker_flag_from_boost_target TARGET OUT_VAR)
 endfunction()
 
 if (Boost_FOUND)
-get_linker_flag_from_boost_target(Boost::program_options LINK_FLAG)
+get_linker_flag_from_library_target(Boost::program_options LINK_FLAG)
 set(Boost_LIBRARIES_  ${LINK_FLAG})
-get_linker_flag_from_boost_target(Boost::filesystem LINK_FLAG)
+get_linker_flag_from_library_target(Boost::filesystem LINK_FLAG)
 set(Boost_LIBRARIES_ "${Boost_LIBRARIES_} ${LINK_FLAG}")
 
 message(STATUS "using boost include for OMCompiler/SimulationRuntime/cpp runtime: ${Boost_INCLUDE_DIR}")
