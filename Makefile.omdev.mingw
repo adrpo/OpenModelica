@@ -45,7 +45,6 @@ builddir_lib=$(OMBUILDDIR)/lib/omc
 builddir_inc=$(OMBUILDDIR)/include/omc
 builddir_bin_share_qt5_translations=$(OMBUILDDIR)/bin/share/qt5/translations
 builddir_bin_share_qt6_translations=$(OMBUILDDIR)/bin/share/qt6/translations
-builddir_share_qt6_resources=$(OMBUILDDIR)/share/qt6/resources
 builddir_bin_share_qt6_resources=$(OMBUILDDIR)/bin/share/qt6/resources
 builddir_bin_share_qt6_bin=$(OMBUILDDIR)/bin/share/qt6/bin
 
@@ -192,8 +191,6 @@ ifeq ($(OM_QT_MAJOR_VERSION),6)
 	cp -pufr $(OM_MSYS_ENV_DIR)/share/qt6/translations/* $(builddir_bin_share_qt6_translations)/
 	mkdir -p $(builddir_bin_share_qt6_bin)/
 	cp -pufr $(OM_MSYS_ENV_DIR)/share/qt6/bin/* $(builddir_bin_share_qt6_bin)/
-	mkdir -p $(builddir_share_qt6_resources)/
-	cp -pufr $(OM_MSYS_ENV_DIR)/share/qt6/resources/* $(builddir_share_qt6_resources)/
 	mkdir -p $(builddir_bin_share_qt6_resources)/
 	cp -pufr $(OM_MSYS_ENV_DIR)/share/qt6/resources/* $(builddir_bin_share_qt6_resources)/
 else
