@@ -72,7 +72,9 @@ if(OM_OMEDIT_INSTALL_RUNTIME_DLLS AND MINGW)
 
   message(STATUS "Looking for runtime dependencies of OMEdit in ${MSYSTEM_PREFIX_ESCAPED}/bin ${RUNTIME_LIB_DIRS}")
 
-  cmake_policy(SET CMP0207 NEW)
+  if(NOT ${CMAKE_VERSION} VERSION_LESS "4.3")
+    cmake_policy(SET CMP0207 NEW)
+  endif()
   install(TARGETS OMEdit
           RUNTIME_DEPENDENCIES
             DIRECTORIES ${MSYSTEM_PREFIX_ESCAPED}/bin ${RUNTIME_LIB_DIRS}
