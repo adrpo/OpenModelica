@@ -212,7 +212,7 @@ using std::to_string;
 #endif //!USE_CPP_03
 
 #if defined(USE_THREAD)
-  #include <Core/Utils/extension/barriers.hpp>
+  #include <Utils/extension/barriers.hpp>
 #endif //USE_THREAD
 
 
